@@ -842,15 +842,14 @@ void lcd_00_02_Temp_set_display_data() {
 }
 
 void lcd_00_03_Selected_speed_display_data() {
+  lcd.setCursor(3, 3);
+  lcd.autoscroll();
   if (operation_mode == true) {
-    lcd.setCursor(3, 3);
-    lcd.autoscroll();
-    lcd.print(temp_fixed);
-    lcd.noAutoscroll();
+    lcd.print(selection_speed_table[selection_speed][0]);
   } else {
-    lcd.setCursor(0, 3);
     lcd.print("----");
   }
+  lcd.noAutoscroll();
 }
 
 char lcd_05_00_Operation_status_text() {

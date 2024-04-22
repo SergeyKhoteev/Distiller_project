@@ -2,6 +2,7 @@
 #include <microDS18B20.h>
 #include <GyverTM1637.h>
 #include <OneButton.h>
+#include <LiquidCrystal_I2C.h>
 
 #define DS_PIN 2  // пин для термометров
 #define DS_SENSOR_AMOUNT 4  //кол-во датчиков
@@ -152,12 +153,10 @@ bool main_mode_selection = false;
 bool snab_mode = false;
 bool rekt_mode = false;
 bool test_mode = false;
-bool main_mode_selection_is_done = false;
 
 bool sub_mode_selection = false;
 bool head_mode = false;
 bool body_mode = false;
-bool sub_mode_selection_is_done = false;
 
 bool flowrate_mode_selection = false;
 bool auto_flowrate_mode = false;
@@ -174,12 +173,7 @@ void change_mode() {
   if (selection_mode == true) {
     if (main_mode_selection == false) {
       if (sub_mode_selection == false) {
-        if (flowrate_mode_selection == false) {
-          // если не находимся ни в одном из подрежимов, то запускаем алгоритм выбора режима для настройки
-          select_and_confirm_area_to_set();
-        } else {  // если выбрана настройка режима отбора, запускается алгоритм выбора опции для режима
-          select_and_confirm_flowrate_mode();
-        }
+        select_and_confirm_area_to_set();
       } else {  // если выбрана настройка режима субрежима, запускается алгоритм выбора опции для режима
         select_and_confirm_sub_mode();
       }
@@ -217,22 +211,15 @@ void select_and_confirm_area_to_set() {
   if (val == 1 && confirm_choice == true) {
     main_mode_selection = true;
     sub_mode_selection = false;
-    flowrate_mode_selection = false;
   } else if (val == 2 && confirm_choice == true) {
     main_mode_selection = false;
     sub_mode_selection = true;
-    flowrate_mode_selection = false;
-  } else if (val == 3 && confirm_choice == true) {
-    main_mode_selection = false;
-    sub_mode_selection = false;
-    flowrate_mode_selection = true;
   }
   confirm_choice = false;
 }
 
 // В режиме настройки основного режима выбираем конкретное значение
 void select_and_confirm_main_mode() {
-  main_mode_selection_is_done = false;
   snab_mode = false;
   rekt_mode = false;
   test_mode = false;
@@ -242,26 +229,22 @@ void select_and_confirm_main_mode() {
     rekt_mode = false;
     test_mode = false;
     main_mode_selection = false;
-    main_mode_selection_is_done = true;
   } else if (val == 2 && confirm_choice == true) {
     snab_mode = false;
     rekt_mode = true;
     test_mode = false;
     main_mode_selection = false;
-    main_mode_selection_is_done = true;
   } else if (val == 3 && confirm_choice == true) {
     snab_mode = false;
     rekt_mode = false;
     test_mode = true;
     main_mode_selection = false;
-    main_mode_selection_is_done = true;
   }
   confirm_choice = false;
 }
 
 // В режиме настройки суб режима выбираем конкретное значение
 void select_and_confirm_sub_mode() {
-  sub_mode_selection_is_done = false;
   head_mode = false;
   body_mode = false; 
   int val = get_analog_val_2();
@@ -269,32 +252,10 @@ void select_and_confirm_sub_mode() {
     head_mode = true;
     body_mode = false;
     sub_mode_selection = false;
-    sub_mode_selection_is_done = true;
   } else if (val == 2 && confirm_choice == true) {
     head_mode = false;
     body_mode = true;
     sub_mode_selection = false;
-    sub_mode_selection_is_done = true;
-  }
-  confirm_choice = false;
-}
-
-// В режиме настройки режима отбора выбираем конкретное значение
-void select_and_confirm_flowrate_mode() {
-  auto_flowrate_mode = false;
-  manual_flowrate_mode = false;
-  flowrate_mode_selection_is_done = false;
-  int val = get_analog_val_2();
-  if (val == 1 && confirm_choice == true) {
-    auto_flowrate_mode = true;
-    manual_flowrate_mode = false;
-    flowrate_mode_selection = false;
-    flowrate_mode_selection_is_done = true;
-  } else if (val == 2 && confirm_choice == true) {
-    auto_flowrate_mode = false;
-    manual_flowrate_mode = true;
-    flowrate_mode_selection = false;
-    flowrate_mode_selection_is_done = true;
   }
   confirm_choice = false;
 }
@@ -755,244 +716,203 @@ GyverTM1637 display_3(DISP_CLK_TIME_PIN, DISP_TIME_PIN);
 GyverTM1637 display_4(DISP_CLK_BLANK_PIN, DISP_TEMP_CUBE_PIN);
 GyverTM1637 display_5(DISP_CLK_BLANK_PIN, DISP_TEMP_PIPE_PIN);
 
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
 // показать температуру на дисплеях
 unsigned long last_time_display_upd = 0;
-int display_temp_delay = 200;
 int general_blink_delay = 1000;
 int selection_in_menu_blink_delay = general_blink_delay / 2;
 int selection_blink_delay = selection_in_menu_blink_delay / 2;
 
-byte test_text[][4] = {
-  {_dash, _dash, _dash, _dash}, // - 0
-  {_empty, _empty, _empty, _empty}, // - 1
-  { _S, _N, _A, _B}, // - 2
-  {_r, _E, _C, _t}, // - 3
-  {_t, _E, _S, _t}, // - 4
-  {_E, _r, _r, _r}, // - 5
-  {_H, _E, _A, _D}, // - 6
-  {_B, _o, _d, _Y}, // - 7
-  {_A, _U, _t, _O}, // - 8
-  {_P, _E, _r, _S}, // - 9
-  {_O, _P, _E, _r}, // - 10
-  {_F, _l, _n, _n}, // - 11
-  {_P, _A, _U, _S}, // - 12
-  {_S, _t, _A, _b}, // - 13
-};
+char lcd_00_00_selected_mode_text() {
+  if (rekt_mode == true) {
+    return "Rect";
+  } else if (snab_mode == true) {
+    return "Snab";
+  } else if (test_mode == true) {
+    return "Test";
+  } else {
+    return "    ";
+  }
+}
 
+char lcd_00_00_selection_mode_main_mode_selection() {
+  if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
+    return "    ";
+  } else {
+    switch (get_analog_val_3()) {
+      case 1: return "Snab"; break;
+      case 2: return "Rect"; break;
+      case 3: return "Test"; break;
+    }
+  }
+}
 
-int get_display_1_data_int() {
+char lcd_00_00_selection_mode_main_menu () {
+  if ((get_analog_val_2() == 1) && ((main_mode_selection + sub_mode_selection) == 0)) {
+    if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
+      return "----";
+    } else {
+      return lcd_00_00_selected_mode_text();
+    }
+  } else {
+    return lcd_00_00_selected_mode_text();
+  }
+}
+
+char lcd_00_00_Mode() {
   if (start_mode == true) {
-    return 0;
+    return "----";
   } else if (selection_mode == true) {
     if (main_mode_selection == true) {
-      if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
-        return 1;
-      } else {
-        int val = get_analog_val_3();
-        if (val == 1) {
-          return 2;
-        } else if (val == 2) {
-          return 3;
-        } else if (val == 3) {
-          return 4;          
-        }
-      }
+      return lcd_00_00_selection_mode_main_mode_selection();
     } else {
-      if ((get_analog_val_2() == 1) && ((main_mode_selection + sub_mode_selection + flowrate_mode_selection) == 0)) {
-        if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
-          return 0;
-        } else {
-          if (rekt_mode == true) {
-            return 3;
-          } else if (snab_mode == true) {
-            return 2;
-          } else if (test_mode == true) {
-            return 4;
-          } else {
-            return 1;
-          }
-        }
-      } else {
-        if (rekt_mode == true) {
-          return 3;
-        } else if (snab_mode == true) {
-          return 2;
-        } else if (test_mode == true) {
-          return 4;
-        } else {
-          return 1;
-        }
-      }
+      return lcd_00_00_selection_mode_main_menu();
     }
   } else if (operation_mode == true) {
-    if (snab_mode == true) {
-      if (under_operation == true) {
-        if ((current_time % general_blink_delay) < (general_blink_delay / 2)) {
-          return 2;
-        } else {
-          if (confirm_start == true) {
-            return 10;
-          } else {
-            return 12;
-          }
-        }
-      } else if (finished == true) {
-        if ((current_time % general_blink_delay) < (general_blink_delay / 2)) {
-          return 2;
-        } else {
-          return 11;
-        }
-      }
-    } else if (rekt_mode == true) {
-      if (under_operation == true) {
-        if ((current_time % general_blink_delay) < (general_blink_delay / 2)) {
-          return 3;
-        } else {
-          if (confirm_start == true) {
-            return 10;
-          } else {
-            return 12;
-          }
-        }
-      } else if (finished == true) {
-        if ((current_time % general_blink_delay) < (general_blink_delay / 2)) {
-          return 3;
-        } else {
-          return 11;
-        }
-      }
-    } else if (test_mode == true) {
-      if (under_operation == true) {
-        if ((current_time % general_blink_delay) < (general_blink_delay / 2)) {
-          return 4;
-        } else {
-          if (confirm_start == true) {
-            return 10;
-          } else {
-            return 12;
-          }
-        }
-      } else if (finished == true) {
-        if ((current_time % general_blink_delay) < (general_blink_delay / 2)) {
-          return 4;
-        } else {
-          return 11;
-        }
-      }
-    } else {
-      return 5;
-    }
+    return lcd_00_00_selected_mode_text();
+  } 
+}
+
+void lcd_00_00_Mode_display_data() {
+  lcd.setCursor(0, 0);
+  lcd.print(lcd_00_00_Mode());
+}
+
+char lcd_00_01_selected_submode_text() {
+  if (head_mode == true) {
+    return "Head";
+  } else if (body_mode == true) {
+    return "Body";
+  } else {
+    return "   ";
   }
 }
 
-int get_display_2_data_int() {
+char lcd_00_01_selection_mode_sub_mode_selection () {
+  if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
+    return "    ";
+  } else {
+    switch (get_analog_val_2()) {
+      case 1: return "Head"; break;
+      case 2: return "Body"; break;
+    }
+  }  
+}
+
+char lcd_00_01_selection_mode_main_menu () {
+  if ((get_analog_val_2() == 2) && ((main_mode_selection + sub_mode_selection) == 0)) {
+    if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
+      return "----";
+    } else {
+      return lcd_00_01_selected_submode_text();
+    }
+  } else {
+    return lcd_00_01_selected_submode_text();
+  }
+}
+
+char lcd_00_01_Sub_mode() {
   if (start_mode == true) {
-    return 0;
+    return "----";
   } else if (selection_mode == true) {
     if (sub_mode_selection == true) {
-      if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
-        return 1;
-      } else {
-        int val = get_analog_val_2();
-        if (val == 1) {
-          return 6;
-        } else if (val == 2) {
-          return 7;
-        }
-      }
+      lcd_00_01_selection_mode_sub_mode_selection();
     } else {
-      if ((get_analog_val_2() == 2) && ((main_mode_selection + sub_mode_selection + flowrate_mode_selection) == 0)) {
-        if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
-          return 0;
-        } else {
-          if (head_mode == true) {
-            return 6;
-          } else if (body_mode == true) {
-            return 7;
-          } else {
-            return 1;
-          }
-        }
-      } else {
-        if (head_mode == true) {
-          return 6;
-        } else if (body_mode == true) {
-          return 7;
-        } else {
-          return 1;
-        }
-      }
+      lcd_00_00_selection_mode_main_menu();
     }
   } else if (operation_mode == true) {
-    if (head_mode == true) {
-      return 6;
-    } else if (body_mode == true) {
-      if ((current_time % general_blink_delay) < (general_blink_delay / 2)) {
-        return 7;
-      } else {
-        if (stabilization_mode == true) {
-          return 13;
-        }
-      }
-    } else {
-      return 5;
-    }
+    return lcd_00_01_selected_submode_text();
   }
 }
 
-int get_display_3_data_int() {
-  if (start_mode == true) {
-    return 0;
-  } else if (selection_mode == true) {
-    if (flowrate_mode_selection == true) {
-      if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
-        return 1;
+void lcd_00_01_Sub_mode_display_data() {
+  lcd.setCursor(0, 1);
+  lcd.print(lcd_00_01_Sub_mode());
+}
+
+void lcd_00_02_Temp_set_display_data() {
+  if (operation_mode == true) {
+    lcd.setCursor(0, 2);
+    lcd.print(temp_fixed);  
+  } else {
+    lcd.setCursor(0, 2);
+    lcd.print("----");
+  }
+}
+
+void lcd_00_03_Selected_speed_display_data() {
+  if (operation_mode == true) {
+    lcd.setCursor(3, 3);
+    lcd.autoscroll();
+    lcd.print(temp_fixed);
+    lcd.noAutoscroll();
+  } else {
+    lcd.setCursor(0, 3);
+    lcd.print("----");
+  }
+}
+
+char lcd_05_00_Operation_status_text() {
+  if (operation_mode == true) {
+    if (under_operation == true) {
+      if (confirm_start == true) {
+        return "Oper";
       } else {
-        int val = get_analog_val_2();
-        if (val == 1) {
-          return 8;
-        } else if (val == 2) {
-          return 9;
-        }
+        return "Paus";
       }
-    } else {
-      if ((get_analog_val_3() == 3) && ((main_mode_selection + sub_mode_selection + flowrate_mode_selection) == 0)) {
-        if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
-          return 0;
-        } else {
-          if (auto_flowrate_mode == true) {
-            return 8;
-          } else if (manual_flowrate_mode == true) {
-            return 9;
-          } else {
-            return 1;
-          }
-        }
-      } else {
-        if (auto_flowrate_mode == true) {
-          return 8;
-        } else if (manual_flowrate_mode == true) {
-          return 9;
-        } else {
-          return 1;
-        }
-      }
+    } else if (finished == true) {
+      return "Fini";
     }
-  } else if (operation_mode == true) {
-    if (auto_flowrate_mode == true) {
-      return 8;
-    } else if (manual_flowrate_mode == true) {
-      return 9;
-    } else {
-      return 5;
-    }
+  } else {
+    return "----";
+  }
+}
+
+void lcd_05_00_Operation_status_display_data() {
+  lcd.setCursor(5, 0);
+  lcd.print(lcd_05_00_Operation_status_text());
+}
+
+char lcd_05_01_Stab_status_text() {
+  if (stabilization_mode == false) {
+    return "Norm";
+  } else {
+    return "Stab";
+  }
+}
+
+void lcd_05_01_Stab_status_display_data() {
+  lcd.setCursor(5, 1);
+  lcd.print(lcd_05_01_Stab_status_text());
+}
+
+void lcd_05_02_Temp_pipe_display_data() {
+  lcd.setCursor(5, 2);
+  lcd.print(temp_pipe.get_avg());
+}
+
+void lcd_05_03_Temp_cube_display_data() {
+  lcd.setCursor(5, 3);
+  lcd.print(temp_cube.get_avg());
+}
+
+void lcd_display_data() {
+  if (current_time - last_time_display_upd > 100) {
+    lcd_00_00_Mode_display_data();
+    lcd_00_01_Sub_mode_display_data();
+    lcd_00_02_Temp_set_display_data();
+    lcd_00_03_Selected_speed_display_data();
+    lcd_05_00_Operation_status_display_data();
+    lcd_05_01_Stab_status_display_data();
+    lcd_05_02_Temp_pipe_display_data();
+    lcd_05_03_Temp_cube_display_data();
+    last_time_display_upd = current_time;
   }
 }
 
 void display_data() {
   if (current_time - last_time_display_upd > 100) {
-    display_1.displayByte(test_text[get_display_1_data_int()]);
-    display_2.displayByte(test_text[get_display_2_data_int()]);
     display_3.displayInt(selection_speed_table[selection_speed][0]);
     display_4.displayInt(temp_cube.get_avg());
     display_5.displayInt(temp_pipe.get_avg());
@@ -1089,177 +1009,4 @@ void loop() {
   change_mode();
   display_data();
   // print_mode();
-
 }
-
-
-// int get_display_1_data_int() {
-//   if (start_mode == true) {
-//     return 0;
-//   } else if (selection_mode == true) {
-//     if (main_mode_selection == true) {
-//       if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
-//         return 1;
-//       } else {
-//         int val = get_analog_val_3();
-//         if (val == 1) {
-//           return 2;
-//         } else if (val == 2) {
-//           return 3;
-//         } else if (val == 3) {
-//           return 4;          
-//         }
-//       }
-//     } else {
-//       if ((get_analog_val_3() == 1) && ((main_mode_selection + sub_mode_selection + flowrate_mode_selection) == 0)) {
-//         if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
-//           return 0;
-//         } else {
-//           if (rekt_mode == true) {
-//             return 3;
-//           } else if (snab_mode == true) {
-//             return 2;
-//           } else if (test_mode == true) {
-//             return 4;
-//           } else {
-//             return 1;
-//           }
-//         }
-//       } else {
-//         if (rekt_mode == true) {
-//           return 3;
-//         } else if (snab_mode == true) {
-//           return 2;
-//         } else if (test_mode == true) {
-//           return 4;
-//         } else {
-//           return 1;
-//         }
-//       }
-//     }
-//   } else if (operation_mode == true) {
-//     if (snab_mode == true) {
-//       return 2;
-//     } else if (rekt_mode == true) {
-//       return 3;
-//     } else if (test_mode == true) {
-//       if (under_operation == true) {
-//         if ((current_time % general_blink_delay) < (general_blink_delay / 2)) {
-//           return 4;
-//         } else {
-//           if (confirm_start == true) {
-//             return 10;
-//           } else {
-//             return 12;
-//           }
-//         }
-//       } else if (finished == true) {
-//         if ((current_time % general_blink_delay) < (general_blink_delay / 2)) {
-//           return 4;
-//         } else {
-//           return 11;
-//         }
-//       }
-//     } else {
-//       return 5;
-//     }
-//   }
-// }
-
-// int get_display_2_data_int() {
-//   if (start_mode == true) {
-//     return 0;
-//   } else if (selection_mode == true) {
-//     if (sub_mode_selection == true) {
-//       if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
-//         return 1;
-//       } else {
-//         int val = get_analog_val_2();
-//         if (val == 1) {
-//           return 6;
-//         } else if (val == 2) {
-//           return 7;
-//         }
-//       }
-//     } else {
-//       if ((get_analog_val_3() == 2) && ((main_mode_selection + sub_mode_selection + flowrate_mode_selection) == 0)) {
-//         if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
-//           return 0;
-//         } else {
-//           if (head_mode == true) {
-//             return 6;
-//           } else if (body_mode == true) {
-//             return 7;
-//           } else {
-//             return 1;
-//           }
-//         }
-//       } else {
-//         if (head_mode == true) {
-//           return 6;
-//         } else if (body_mode == true) {
-//           return 7;
-//         } else {
-//           return 1;
-//         }
-//       }
-//     }
-//   } else if (operation_mode == true) {
-//     if (head_mode == true) {
-//       return 6;
-//     } else if (body_mode == true) {
-//       return 7;
-//     } else {
-//       return 5;
-//     }
-//   }
-// }
-
-// int get_display_3_data_int() {
-//   if (start_mode == true) {
-//     return 0;
-//   } else if (selection_mode == true) {
-//     if (flowrate_mode_selection == true) {
-//       if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
-//         return 1;
-//       } else {
-//         int val = get_analog_val_2();
-//         if (val == 1) {
-//           return 8;
-//         } else if (val == 2) {
-//           return 9;
-//         }
-//       }
-//     } else {
-//       if ((get_analog_val_3() == 3) && ((main_mode_selection + sub_mode_selection + flowrate_mode_selection) == 0)) {
-//         if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
-//           return 0;
-//         } else {
-//           if (auto_flowrate_mode == true) {
-//             return 8;
-//           } else if (manual_flowrate_mode == true) {
-//             return 9;
-//           } else {
-//             return 1;
-//           }
-//         }
-//       } else {
-//         if (auto_flowrate_mode == true) {
-//           return 8;
-//         } else if (manual_flowrate_mode == true) {
-//           return 9;
-//         } else {
-//           return 1;
-//         }
-//       }
-//     }
-//   } else if (operation_mode == true) {
-//     if (auto_flowrate_mode == true) {
-//       return 8;
-//     } else if (manual_flowrate_mode == true) {
-//       return 9;
-//     } else {
-//       return 5;
-//     }
-//   }
-// }

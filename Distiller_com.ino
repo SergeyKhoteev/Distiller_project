@@ -134,10 +134,12 @@ void print_temp_all() {
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-#define BUTTON_PIN 10
+#define MAIN_BUTTON_PIN 10
+#define SERVICE_BUTTON_PIN 11
 #define ANALOG_MODE_PIN A7     // пин для крутилки режима
 
-OneButton button(BUTTON_PIN);
+OneButton main_button(MAIN_BUTTON_PIN);
+OneButton service_button(SERVICE_BUTTON_PIN);
 
 
 //  управление режимами
@@ -412,44 +414,10 @@ void print_mode() {
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 #define UPPER_VALVE_PIN A0
+#define LOWER_VALVE_PIN A1
 
-// unsigned int selection_speed_table[31][3] = { 
-//   // {SELECTION SPEED, SELECTION DURATION, DELAY DURATION}
-//   {0, 0, 0}, //0
-//   {100, 0277, 0}, // 1
-//   {200, 0603, 0}, // 2
-//   {250, 0753, 0}, // 3
-//   {400, 1111, 0}, // 4
-//   {500, 1389, 0}, // 5
-//   {600, 1666, 0}, // 6
-//   {700, 1944, 0}, // 7
-//   {800, 2222, 0}, // 8
-//   {900, 2500, 0}, // 9
-//   {1000, 2778, 0}, // 10
-//   {1000, 2778, 10000},// 11
-//   {1100, 3055, 9950}, // 12
-//   {1150, 3194, 9900}, // 13
-//   {1200, 3333, 9850}, // 14
-//   {1250, 3472, 9800}, // 15
-//   {1000, 2778, 9750}, // 16
-//   {1000, 2778, 9700}, // 17
-//   {1100, 3055, 9650}, // 18
-//   {1200, 3333, 9600}, // 19
-//   {1300, 3611, 9500}, // 20
-//   {1400, 3888, 9450}, // 21
-//   {1600, 4444, 9400}, // 22
-//   {1650, 4583, 9350}, // 23
-//   {1700, 4722, 9300}, // 24
-//   {1750, 4861, 9200}, // 25
-//   {1800, 5000, 9150}, // 26
-//   {1850, 5139, 9100}, // 27
-//   {1900, 5277, 9000}, // 28
-//   {1950, 5416, 8900}, // 29
-//   {2000, 5555, 8800}, // 30
-// };
-
-
-unsigned int selection_speed_table[][3] = { 
+#define selection_speed_table_len 35
+unsigned int selection_speed_table[selection_speed_table_len][3] = { 
   // {SELECTION SPEED, SELECTION DURATION, DELAY DURATION}
   {2200, 6111, 0}, //0
   {2150, 5972, 0}, // 1
@@ -475,20 +443,24 @@ unsigned int selection_speed_table[][3] = {
   {1150, 3194, 0}, // 21
   {1100, 3056, 0}, // 22
   {1050, 2917, 0}, // 23
-  {900, 2500, 0},  // 24
-  {800, 2222, 0},  // 25
-  {700, 1944, 0},  // 26
-  {600, 1667, 0},  // 27
-  {500, 1389, 0},  // 28
-  {400, 1111, 0},  // 29
-  {300, 833, 0},   // 30
-  {250, 603, 0}    // 31
+  {1000, 2778, 0}, // 24
+  {900, 2500, 0},  // 25
+  {800, 2222, 0},  // 26
+  {700, 1944, 0},  // 27
+  {600, 1667, 0},  // 28
+  {500, 1389, 0},  // 29
+  {400, 1111, 0},  // 30
+  {300, 833, 0},   // 31
+  {250, 603, 0},   // 32
+  {150, 0, 0},   // 33
+  {30, 0, 0}   // 34
 };
 
 bool under_operation = false;
 bool stabilization_mode = false;
 bool finished = false;
 bool upper_valve_is_open = false;
+bool lower_valve_is_open = false;
 
 bool scenario_snabby_head_operation = false;
 bool scenario_snabby_body_operation = false;
@@ -500,6 +472,7 @@ unsigned long stabilization_mode_time_started = 0;
 unsigned long stabilization_mode_duration = 180000; // 3 min
 unsigned long operation_time_started = 0;
 unsigned long snabby_head_mode_duration = 5400000; // 1 hr 30 min
+unsigned long rekt_head_mode_duration = 10800000; // 3hr 00 min
 unsigned long test_mode_duration = 180000; // 3 min
 
 unsigned long test_mode_time_started = 0;
@@ -507,12 +480,24 @@ unsigned long test_mode_time_started = 0;
 unsigned int temp_fixed = 0;
 int temp_diff_snabb = 10;
 
-int selection_speed = 0;
+int selection_speed_body = 0;
+int selection_speed_head = 31;
 unsigned int totaly_selected = 0;
 
-int find_optimal_selection_speed(int selection_speed) {
+void selection_speed_body_decrease() {
+  selection_speed_body ++;
+  lcd_display_selected_speed();
+}
+
+void selection_speed_body_increase() {
+  selection_speed_body --;
+  lcd_display_selected_speed();
+}
+
+
+int find_optimal_selection_speed(int selection_speed_body) {
   int current_temp = temp_cube.get_avg();
-  for (int i = selection_speed; i < 24; i ++) {
+  for (int i = selection_speed_body; i < 31; i ++) {
     if (current_temp < selection_speed_table[i][2]) {
       return i;
     }
@@ -547,13 +532,43 @@ void upper_valve_operation(int speed) {
   }
 }
 
+void open_lower_valve() {
+  digitalWrite(LOWER_VALVE_PIN, 1);
+  lower_valve_is_open = true;
+  Serial.print("Valve opened at: ");
+  Serial.println(current_time);
+}
+
+void close_lower_valve() {
+  digitalWrite(LOWER_VALVE_PIN, 0);
+  lower_valve_is_open = false;
+  Serial.print("Valve closed at: ");
+  Serial.println(current_time);
+}
+
+void lower_valve_operation(int speed) {
+  if (stabilization_mode == false) {
+    if ((current_time % 30000) < selection_speed_table[speed][1]) {
+      if (lower_valve_is_open == false) {
+        open_lower_valve();
+      }
+    } else {
+      if (lower_valve_is_open == true) {
+        close_lower_valve();
+      }
+    }
+  }
+}
+
 void turn_on_stabilization_mode() {
   if (stabilization_mode == false) {
     close_upper_valve();
+    close_lower_valve();
     Serial.println("stabilization_mode is on");
     under_operation = false;
     stabilization_mode = true;
-    stabilization_mode_time_started = current_time;  
+    stabilization_mode_time_started = current_time;
+    lcd_display_stabilization_mode();  
   }
 }
 
@@ -566,6 +581,7 @@ void turn_off_stabilization_mode() {
         Serial.println("stabilization_mode is off");
         under_operation = true;
         stabilization_mode = false;
+        lcd_display_stabilization_mode();
       }
     }
   }
@@ -597,7 +613,7 @@ void check_temp_and_start_stabilization_mode_if_temp_not_ok() {
   if (temp_in_pipe_more_than_fixed() == true) {
     if (stabilization_mode == false) {
       serial_display_temp_failure_report();
-      selection_speed ++;
+      selection_speed_body_decrease();
       turn_on_stabilization_mode();
     }
   } else {
@@ -608,13 +624,14 @@ void check_temp_and_start_stabilization_mode_if_temp_not_ok() {
 void scenario_snabby_head() {
   if (scenario_snabby_head_operation == false) {
     operation_time_started = current_time;
-    selection_speed = -1;
+    selection_speed_head = selection_speed_table_len - 4;
     scenario_snabby_head_operation = true;
     under_operation = true;
     Serial.println("scenario_snabby_head started");
+    lcd_set_display_in_operation_update();
   }
   if (current_time - operation_time_started < snabby_head_mode_duration) {
-    upper_valve_operation(selection_speed);
+    upper_valve_operation(selection_speed_head);
   } else {
     close_upper_valve();
     finished = true;
@@ -629,13 +646,14 @@ void scenario_snabby_body() {
     temp_fixed = temp_pipe.get_avg();
     scenario_snabby_body_operation = true;
     under_operation = true;
-    selection_speed = 0;
+    selection_speed_body = 0;
     Serial.println("scenario_snabby_body started");
+    lcd_set_display_in_operation_update();
   }
-  // selection_speed = find_optimal_selection_speed(selection_speed);
+  // selection_speed_body = find_optimal_selection_speed(selection_speed_body);
   check_temp_and_start_stabilization_mode_if_temp_not_ok();
   if (temp_cube.get_avg() < 9900) {
-    upper_valve_operation(selection_speed);
+    upper_valve_operation(selection_speed_body);
   } else {
     close_upper_valve();
     finished = true;
@@ -646,23 +664,61 @@ void scenario_snabby_body() {
 }
 
 void scenario_rekt_head() {
-
+  if (scenario_rekt_head_operation == false) {
+    operation_time_started = current_time;
+    selection_speed_head = selection_speed_table_len - 2;
+    scenario_rekt_head_operation = true;
+    under_operation = true;
+    Serial.println("scenario_rekt_head started");
+    lcd_set_display_in_operation_update();
+  }
+  if (current_time - operation_time_started < rekt_head_mode_duration) {
+    upper_valve_operation(selection_speed_head);
+  } else {
+    close_upper_valve();
+    finished = true;
+    confirm_start = false;
+    scenario_rekt_head_operation = false;
+    under_operation = false;
+  }
 }
 
 void scenario_rekt_body() {
-
+  if (scenario_rekt_body_operation == false) {
+    temp_fixed = temp_pipe.get_avg();
+    scenario_rekt_body_operation = true;
+    under_operation = true;
+    selection_speed_body = 0;
+    Serial.println("scenario_rekt_body started");
+    selection_speed_head = selection_speed_table_len - 1;
+    lcd_set_display_in_operation_update();
+  }
+  selection_speed_body = find_optimal_selection_speed(selection_speed_body);
+  check_temp_and_start_stabilization_mode_if_temp_not_ok();
+  if (temp_cube.get_avg() < 9600) {
+    upper_valve_operation(selection_speed_head);
+    lower_valve_operation(selection_speed_body);
+  } else {
+    close_lower_valve();
+    close_upper_valve();
+    finished = true;
+    confirm_start = false;
+    scenario_snabby_body_operation = false;
+    under_operation = false;
+  }
 }
 
 void scenario_test() {
   if (scenario_test_operation == false) {
     operation_time_started = current_time;
-    selection_speed = 0;
+    selection_speed_body = 0;
     scenario_test_operation = true;
     under_operation = true;
     Serial.println("scenario_test started");
+    lcd_set_display_in_operation_update();
   } 
   if ((current_time - operation_time_started) < test_mode_duration) {
-    upper_valve_operation(selection_speed);
+    upper_valve_operation(selection_speed_body);
   } else {
     close_upper_valve();
     Serial.println("scenario_test finished");
@@ -710,21 +766,172 @@ void operation() {
 
 
 // инициализируем дисплеи
-GyverTM1637 display_1(DISP_CLK_BLANK_PIN, DISP_MODE_PIN);
-GyverTM1637 display_2(DISP_CLK_BLANK_PIN, DISP_SUB_MODE_PIN);
-GyverTM1637 display_3(DISP_CLK_TIME_PIN, DISP_TIME_PIN);
-GyverTM1637 display_4(DISP_CLK_BLANK_PIN, DISP_TEMP_CUBE_PIN);
-GyverTM1637 display_5(DISP_CLK_BLANK_PIN, DISP_TEMP_PIPE_PIN);
-
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 // показать температуру на дисплеях
 unsigned long last_time_display_upd = 0;
-int general_blink_delay = 1000;
+int general_blink_delay = 2000;
 int selection_in_menu_blink_delay = general_blink_delay / 2;
 int selection_blink_delay = selection_in_menu_blink_delay / 2;
 
-char lcd_00_00_selected_mode_text() {
+
+#define lcd_main_mode_coordinates 11, 0
+#define lcd_sub_mode_coordinates 11, 1
+#define lcd_selection_speed_coordinates 11, 3
+#define lcd_operation_status_coordinates 5, 0
+#define lcd_stabilization_status_coordinates 5, 1
+#define lcd_temp_pipe_coordinates 5, 2
+#define lcd_temp_cube_coordindates 5, 3
+
+void lcd_display_main_mode_in_operation() {
+  lcd.setCursor(lcd_main_mode_coordinates);
+  lcd.print(lcd_00_00_selected_mode_text());
+}
+
+void lcd_display_sub_mode_in_operation() {
+  lcd.setCursor(lcd_sub_mode_coordinates);
+  lcd.print(lcd_00_01_selected_sub_mode_text());
+}
+
+void lcd_display_stabilization_mode() {
+  lcd.setCursor(lcd_stabilization_status_coordinates);
+  lcd.print(lcd_05_01_Stab_status_text());
+}
+
+void lcd_display_temp_pipe() {
+  lcd.setCursor(lcd_temp_pipe_coordinates);
+  lcd.print(temp_pipe.get_avg());
+}
+
+void lcd_display_temp_cube() {
+  lcd.setCursor(lcd_temp_cube_coordindates);
+  lcd.print(temp_cube.get_avg());
+}
+
+void lcd_set_display_in_operation_general() {
+  lcd_display_main_mode_in_operation();
+  lcd_display_sub_mode_in_operation();
+  lcd_display_operation_status();
+}
+
+void lcd_set_display_in_selection_general() {
+  lcd.setCursor(lcd_main_mode_coordinates);
+  lcd.print("    ");
+  lcd.setCursor(lcd_sub_mode_coordinates);
+  lcd.print("    ");
+  lcd.setCursor(lcd_selection_speed_coordinates);
+  lcd.print("    ");
+  lcd.setCursor(lcd_operation_status_coordinates);
+  lcd.print("     ");
+  lcd.setCursor(lcd_stabilization_status_coordinates);
+  lcd.print("     ");
+  lcd.setCursor(lcd_temp_pipe_coordinates);
+  lcd.print("     ");
+  lcd.setCursor(lcd_temp_cube_coordindates);
+  lcd.print("     ");
+}
+
+void lcd_set_display_in_operation_update() {
+  lcd_display_selected_speed();
+  lcd_display_operation_status();
+  lcd_display_stabilization_mode();
+}
+
+void lcd_display_temperatures() {
+  if (operation_mode == true) {
+    lcd_display_temp_pipe();
+    lcd_display_temp_cube();
+  }
+}
+
+void lcd_update_data_in_selection() {
+  if (selection_mode == true) {
+    lcd_display_main_mode_in_selection();
+    lcd_display_sub_mode_in_selection();
+  }
+}
+
+void lcd_display_sub_mode_in_selection() {
+  lcd.setCursor(lcd_sub_mode_coordinates);
+  lcd.print(lcd_00_01_sub_mode());
+}
+
+void lcd_display_main_mode_in_selection() {
+  lcd.setCursor(lcd_main_mode_coordinates);
+  lcd.print(lcd_display_main_mode_in_selection_text());
+}
+
+void lcd_display_data() {
+  lcd_update_data_in_selection();
+  lcd_display_temperatures();
+}
+
+
+
+String lcd_operation_status_text() {
+  if (selection_mode == true) {
+    return "Selct";
+  } else if (operation_mode == true) {
+    if (under_operation == true) {
+      if (confirm_start == true) {
+        return "Oprtn";
+      } else {
+        return "Pause";
+      }
+    } else if (finished == true) {
+      return "Finsh";
+    } else {
+      return "W84Cf";
+    }
+  } else {
+    return "Start";
+  }
+}
+
+void lcd_display_operation_status() {
+  lcd.setCursor(lcd_operation_status_coordinates);
+  lcd.print(lcd_operation_status_text());
+}
+
+String lcd_05_01_Stab_status_text() {
+  if (under_operation == true) {
+    return "Basic";
+  } else if (stabilization_mode == true) {
+    return "Stabs";
+  }
+  return "     ";
+}
+
+void lcd_display_selection_speed_in_start_and_select() {
+  lcd.setCursor(lcd_selection_speed_coordinates);
+  lcd.print("    ");
+}
+
+void lcd_display_selection_speed_in_opration(int selection_speed) {
+  if (selection_speed_table[selection_speed][0] < 1000) {
+    lcd.setCursor(lcd_selection_speed_coordinates);
+    lcd.print(" ");
+    lcd.print(selection_speed_table[selection_speed][0]);
+  } else {
+    lcd.setCursor(lcd_selection_speed_coordinates);
+    lcd.print(selection_speed_table[selection_speed][0]);
+  }
+}
+
+void lcd_display_selected_speed() {
+  if (start_mode == true or selection_mode == true) {
+    lcd_display_selection_speed_in_start_and_select();
+  } else if (operation_mode == true) {
+    if (body_mode == true) {
+      lcd_display_selection_speed_in_opration(selection_speed_body);
+    } else if (head_mode == true) {
+      lcd_display_selection_speed_in_opration(selection_speed_head);
+    }
+  }
+}
+
+
+String lcd_00_00_selected_mode_text() {
   if (rekt_mode == true) {
     return "Rect";
   } else if (snab_mode == true) {
@@ -736,7 +943,7 @@ char lcd_00_00_selected_mode_text() {
   }
 }
 
-char lcd_00_00_selection_mode_main_mode_selection() {
+String lcd_00_00_selection_mode_main_mode_selection() {
   if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
     return "    ";
   } else {
@@ -748,7 +955,7 @@ char lcd_00_00_selection_mode_main_mode_selection() {
   }
 }
 
-char lcd_00_00_selection_mode_main_menu () {
+String lcd_00_00_selection_mode_main_menu () {
   if ((get_analog_val_2() == 1) && ((main_mode_selection + sub_mode_selection) == 0)) {
     if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
       return "----";
@@ -760,36 +967,33 @@ char lcd_00_00_selection_mode_main_menu () {
   }
 }
 
-char lcd_00_00_Mode() {
-  if (start_mode == true) {
-    return "----";
-  } else if (selection_mode == true) {
-    if (main_mode_selection == true) {
-      return lcd_00_00_selection_mode_main_mode_selection();
-    } else {
-      return lcd_00_00_selection_mode_main_menu();
-    }
-  } else if (operation_mode == true) {
-    return lcd_00_00_selected_mode_text();
-  } 
+String lcd_display_main_mode_in_selection_text() {
+  if (main_mode_selection == true) {
+    return lcd_00_00_selection_mode_main_mode_selection();
+  } else {
+    return lcd_00_00_selection_mode_main_menu();
+  }
 }
 
-void lcd_00_00_Mode_display_data() {
-  lcd.setCursor(0, 0);
-  lcd.print(lcd_00_00_Mode());
-}
 
-char lcd_00_01_selected_submode_text() {
+
+
+// void lcd_00_00_Mode_display_data() {
+//   lcd.setCursor(0, 0);
+//   lcd.print(lcd_00_00_Mode());
+// }
+
+String lcd_00_01_selected_sub_mode_text() {
   if (head_mode == true) {
     return "Head";
   } else if (body_mode == true) {
     return "Body";
   } else {
-    return "   ";
+    return "    ";
   }
 }
 
-char lcd_00_01_selection_mode_sub_mode_selection () {
+String lcd_00_01_selection_mode_sub_mode_selection() {
   if ((current_time % selection_blink_delay) < (selection_blink_delay / 2)) {
     return "    ";
   } else {
@@ -797,38 +1001,32 @@ char lcd_00_01_selection_mode_sub_mode_selection () {
       case 1: return "Head"; break;
       case 2: return "Body"; break;
     }
-  }  
+  }
 }
 
-char lcd_00_01_selection_mode_main_menu () {
+String lcd_00_01_selection_mode_main_menu () {
   if ((get_analog_val_2() == 2) && ((main_mode_selection + sub_mode_selection) == 0)) {
     if ((current_time % selection_in_menu_blink_delay) < (selection_in_menu_blink_delay / 2)) {
       return "----";
     } else {
-      return lcd_00_01_selected_submode_text();
+      return lcd_00_01_selected_sub_mode_text();
     }
   } else {
-    return lcd_00_01_selected_submode_text();
+    return lcd_00_01_selected_sub_mode_text();
   }
 }
 
-char lcd_00_01_Sub_mode() {
-  if (start_mode == true) {
-    return "----";
-  } else if (selection_mode == true) {
-    if (sub_mode_selection == true) {
-      lcd_00_01_selection_mode_sub_mode_selection();
-    } else {
-      lcd_00_00_selection_mode_main_menu();
-    }
-  } else if (operation_mode == true) {
-    return lcd_00_01_selected_submode_text();
+String lcd_00_01_sub_mode() {
+  if (sub_mode_selection == true) {
+    return lcd_00_01_selection_mode_sub_mode_selection();
+  } else {
+    return lcd_00_01_selection_mode_main_menu();
   }
 }
 
-void lcd_00_01_Sub_mode_display_data() {
+void lcd_00_01_sub_mode_display_data() {
   lcd.setCursor(0, 1);
-  lcd.print(lcd_00_01_Sub_mode());
+  lcd.print(lcd_00_01_sub_mode());
 }
 
 void lcd_00_02_Temp_set_display_data() {
@@ -837,49 +1035,12 @@ void lcd_00_02_Temp_set_display_data() {
     lcd.print(temp_fixed);  
   } else {
     lcd.setCursor(0, 2);
-    lcd.print("----");
+    lcd.print("    ");
   }
 }
 
-void lcd_00_03_Selected_speed_display_data() {
-  lcd.setCursor(3, 3);
-  lcd.autoscroll();
-  if (operation_mode == true) {
-    lcd.print(selection_speed_table[selection_speed][0]);
-  } else {
-    lcd.print("----");
-  }
-  lcd.noAutoscroll();
-}
 
-char lcd_05_00_Operation_status_text() {
-  if (operation_mode == true) {
-    if (under_operation == true) {
-      if (confirm_start == true) {
-        return "Oper";
-      } else {
-        return "Paus";
-      }
-    } else if (finished == true) {
-      return "Fini";
-    }
-  } else {
-    return "----";
-  }
-}
 
-void lcd_05_00_Operation_status_display_data() {
-  lcd.setCursor(5, 0);
-  lcd.print(lcd_05_00_Operation_status_text());
-}
-
-char lcd_05_01_Stab_status_text() {
-  if (stabilization_mode == false) {
-    return "Norm";
-  } else {
-    return "Stab";
-  }
-}
 
 void lcd_05_01_Stab_status_display_data() {
   lcd.setCursor(5, 1);
@@ -896,25 +1057,21 @@ void lcd_05_03_Temp_cube_display_data() {
   lcd.print(temp_cube.get_avg());
 }
 
-void lcd_display_data() {
+void lcd_update_data_in_selection_mode() {
   if (current_time - last_time_display_upd > 100) {
-    lcd_00_00_Mode_display_data();
-    lcd_00_01_Sub_mode_display_data();
+    if (selection_mode == true) {
+
+    } else if (operation_mode == true) {
+
+    }
+
+    // lcd_00_00_Mode_display_data();
+    lcd_00_01_sub_mode_display_data();
     lcd_00_02_Temp_set_display_data();
-    lcd_00_03_Selected_speed_display_data();
-    lcd_05_00_Operation_status_display_data();
     lcd_05_01_Stab_status_display_data();
     lcd_05_02_Temp_pipe_display_data();
     lcd_05_03_Temp_cube_display_data();
     last_time_display_upd = current_time;
-  }
-}
-
-void display_data() {
-  if (current_time - last_time_display_upd > 100) {
-    display_3.displayInt(selection_speed_table[selection_speed][0]);
-    display_4.displayInt(temp_cube.get_avg());
-    display_5.displayInt(temp_pipe.get_avg());
   }
 }
 
@@ -924,6 +1081,19 @@ void single_click() {
     confirm_choice = true;
   } else if (operation_mode == true) {
     confirm_start = !confirm_start;
+    lcd_display_operation_status();
+  }
+}
+
+void service_single_click() {
+  if (selection_speed_body < (selection_speed_table_len)) {
+    selection_speed_body_decrease();
+  } 
+}
+
+void service_double_click() {
+  if (selection_speed_body > 0) {
+    selection_speed_body_increase();
   }
 }
 
@@ -936,12 +1106,14 @@ void operation_mode_turn_on() {
   stabilization_mode = false;
   finished = false;
   upper_valve_is_open = false;
+  lower_valve_is_open = false;
 
   scenario_snabby_head_operation = false;
   scenario_snabby_body_operation = false;
   scenario_rekt_head_operation = false;
   scenario_rekt_body_operation = false;
   scenario_test_operation = false;
+  lcd_set_display_in_operation_general() ;
 }
 
 // функция для долгого нажатия кнопки: 1 - переход в режим настройки, 2 - переход в режим работы
@@ -952,16 +1124,22 @@ void change_global_mode() {
     start_mode = false;
     operation_mode = false;
 
-  under_operation = false;
-  stabilization_mode = false;
-  finished = false;
-  upper_valve_is_open = false;
+    under_operation = false;
+    stabilization_mode = false;
+    finished = false;
+    upper_valve_is_open = false;
+    lower_valve_is_open = false;
 
-  scenario_snabby_head_operation = false;
-  scenario_snabby_body_operation = false;
-  scenario_rekt_head_operation = false;
-  scenario_rekt_body_operation = false;
-  scenario_test_operation = false;
+    scenario_snabby_head_operation = false;
+    scenario_snabby_body_operation = false;
+    scenario_rekt_head_operation = false;
+    scenario_rekt_body_operation = false;
+    scenario_test_operation = false;
+
+    confirm_start = false;
+    close_lower_valve();
+    close_upper_valve();
+    lcd_set_display_in_selection_general();
   }
   // если находимся в режиме настройки, то повторное удержание переведет в режим работы
   else {
@@ -974,38 +1152,34 @@ void setup() {
   // pinMode(A6, INPUT);
   pinMode(A7, INPUT);
   pinMode(UPPER_VALVE_PIN, OUTPUT);
+  pinMode(LOWER_VALVE_PIN, OUTPUT);
 
   // открываем порт
   Serial.begin(9600);
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(MAIN_BUTTON_PIN, INPUT_PULLUP);
+
+  lcd.init();
+  lcd.backlight();
 
 
   // инициализируем датчики температуры
   for (int i = 0; i < DS_SENSOR_AMOUNT; i++) {
     sensor[i].setAddress(temp_sensors_addr[i]);
   }
-  display_1.clear();
-  display_1.brightness(6);
-  display_2.clear();
-  display_2.brightness(6);
-  display_3.clear();
-  display_3.brightness(6);
-  display_4.clear();
-  display_4.brightness(6);
-  display_5.clear();
-  display_5.brightness(6);
 
-  button.attachLongPressStart(change_global_mode);
-  button.attachClick(single_click);
+  main_button.attachLongPressStart(change_global_mode);
+  main_button.attachClick(single_click);
+  service_button.attachClick(service_single_click);
+  service_button.attachDoubleClick(service_double_click);
 }
 
 void loop() {
   current_time = millis();
-  button.tick();
+  main_button.tick();
+  service_button.tick();
   operation();
   write_temp_to_storage();
   request_temp_all();
   change_mode();
-  display_data();
-  // print_mode();
+  lcd_display_data();
 }

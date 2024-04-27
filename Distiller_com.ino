@@ -853,7 +853,7 @@ void lcd_update_data_in_selection() {
 
 void lcd_display_sub_mode_in_selection() {
   lcd.setCursor(lcd_sub_mode_coordinates);
-  lcd.print(lcd_00_01_sub_mode());
+  lcd.print(lcd_sub_mode_text());
 }
 
 void lcd_display_main_mode_in_selection() {
@@ -862,8 +862,11 @@ void lcd_display_main_mode_in_selection() {
 }
 
 void lcd_display_data() {
-  lcd_update_data_in_selection();
-  lcd_display_temperatures();
+  if (current_time - last_time_display_upd > 100) {
+    lcd_update_data_in_selection();
+    lcd_display_temperatures();
+    last_time_display_upd = current_time;
+  }
 }
 
 
@@ -976,13 +979,6 @@ String lcd_display_main_mode_in_selection_text() {
 }
 
 
-
-
-// void lcd_00_00_Mode_display_data() {
-//   lcd.setCursor(0, 0);
-//   lcd.print(lcd_00_00_Mode());
-// }
-
 String lcd_00_01_selected_sub_mode_text() {
   if (head_mode == true) {
     return "Head";
@@ -1016,62 +1012,11 @@ String lcd_00_01_selection_mode_main_menu () {
   }
 }
 
-String lcd_00_01_sub_mode() {
+String lcd_sub_mode_text() {
   if (sub_mode_selection == true) {
     return lcd_00_01_selection_mode_sub_mode_selection();
   } else {
     return lcd_00_01_selection_mode_main_menu();
-  }
-}
-
-void lcd_00_01_sub_mode_display_data() {
-  lcd.setCursor(0, 1);
-  lcd.print(lcd_00_01_sub_mode());
-}
-
-void lcd_00_02_Temp_set_display_data() {
-  if (operation_mode == true) {
-    lcd.setCursor(0, 2);
-    lcd.print(temp_fixed);  
-  } else {
-    lcd.setCursor(0, 2);
-    lcd.print("    ");
-  }
-}
-
-
-
-
-void lcd_05_01_Stab_status_display_data() {
-  lcd.setCursor(5, 1);
-  lcd.print(lcd_05_01_Stab_status_text());
-}
-
-void lcd_05_02_Temp_pipe_display_data() {
-  lcd.setCursor(5, 2);
-  lcd.print(temp_pipe.get_avg());
-}
-
-void lcd_05_03_Temp_cube_display_data() {
-  lcd.setCursor(5, 3);
-  lcd.print(temp_cube.get_avg());
-}
-
-void lcd_update_data_in_selection_mode() {
-  if (current_time - last_time_display_upd > 100) {
-    if (selection_mode == true) {
-
-    } else if (operation_mode == true) {
-
-    }
-
-    // lcd_00_00_Mode_display_data();
-    lcd_00_01_sub_mode_display_data();
-    lcd_00_02_Temp_set_display_data();
-    lcd_05_01_Stab_status_display_data();
-    lcd_05_02_Temp_pipe_display_data();
-    lcd_05_03_Temp_cube_display_data();
-    last_time_display_upd = current_time;
   }
 }
 

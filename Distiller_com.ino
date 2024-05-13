@@ -6,14 +6,9 @@
 
 #define DS_PIN 2  // пин для термометров
 #define DS_SENSOR_AMOUNT 4  //кол-во датчиков
-#define DISP_MODE_PIN 3       //пин для экрана РЕЖИМ
-#define DISP_SUB_MODE_PIN 4   //пин для экрана СУБРЕЖИМ
-#define DISP_TEMP_CUBE_PIN 5  // пин для экрана температуры в кубе
-#define DISP_TEMP_PIPE_PIN 6  //пин для экрана температуры в царге
-#define DISP_TIME_PIN 7       // пин для экрана отсчета времени
-#define DISP_CLK_BLANK_PIN 8  // пин чтобы небыло точек на экране
-#define DISP_CLK_TIME_PIN 9   // пин для двоеточия часов
 
+// инициализируем дисплеи
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 unsigned long current_time = 0;
 
@@ -32,7 +27,7 @@ uint8_t temp_sensors_addr[][8] = {
 // Класс обработчика температуры
 class Temp {
   public:
-
+    #define len 10
     int values = _values;
 
     Temp(String name) {
@@ -43,8 +38,8 @@ class Temp {
       _sum -= _values[_index];
       _values[_index] = value;
       _sum += value;
-      _avg = _sum / 60;
-      if (_index == 59) {
+      _avg = _sum / len;
+      if (_index == (len - 1)) {
         _index = 0;
       } else {
         _index++;
@@ -67,7 +62,7 @@ class Temp {
       Serial.print("Vals_");
       Serial.print(_name);
       Serial.print(" = {");
-      for (int i = 0; i < 60; i++) {
+      for (int i = 0; i < len; i++) {
         Serial.print(_values[i]);
         Serial.print("; ");
       }
@@ -75,7 +70,7 @@ class Temp {
     }
 
   private:
-    int _values[60] = {};
+    int _values[len] = {};
     int _index = 0;
     unsigned long _sum = 0;
     int _avg = 0;
@@ -87,42 +82,26 @@ Temp temp_pipe("Pipe");
 
 // запрос температуры в указанный период
 unsigned long last_time_request_temp = 0;
-int request_delay = 100;
+#define temp_request_delay 750
 void request_temp_all() {
-  if ((last_time_request_temp == 0) or (current_time - last_time_request_temp > request_delay)) {
-    for (int i = 0; i < DS_SENSOR_AMOUNT; i++) {
-      sensor[i].requestTemp();
-    }
-    last_time_request_temp = current_time;
+  for (int i = 0; i < DS_SENSOR_AMOUNT; i++) {
+    sensor[i].requestTemp();
   }
 }
 
 // записываем температуры в обработчик в указанный период
-unsigned long last_time_add_temp = 0;
-int add_value_delay = 50;
 void write_temp_to_storage() {
-  if ((last_time_add_temp == 0) or (current_time - last_time_add_temp > add_value_delay)) {
-    int temp = sensor[0].getTemp() * 100;
-    temp_cube.add_value(temp);
-    temp = sensor[1].getTemp() * 100;
-    temp_pipe.add_value(temp);
-    last_time_add_temp = current_time;
-  }
+  int temp = sensor[0].getTemp() * 100;
+  temp_cube.add_value(temp);
+  temp = sensor[1].getTemp() * 100;
+  temp_pipe.add_value(temp);
 }
 
-// вывод температуры в серийный порт
-unsigned long last_time_print_temp = 0;
-int print_temp_delay = 100;
-void print_temp_all() {
-  if ((last_time_print_temp == 0) or (current_time - last_time_print_temp > print_temp_delay)) {
-    temp_cube.print_avg();
-    temp_pipe.print_avg();
-    Serial.println();
-    // temp_cube.print_values();
-    // Serial.println();
-    // temp_pipe.print_values();
-    // Serial.println();
-    last_time_print_temp = current_time;
+void write_temp_and_request_new() {
+  if (current_time - last_time_request_temp > temp_request_delay) {
+    write_temp_to_storage();
+    request_temp_all();
+    last_time_request_temp = current_time;
   }
 }
 
@@ -145,7 +124,6 @@ OneButton service_button(SERVICE_BUTTON_PIN);
 //  управление режимами
 bool confirm_choice = false;
 bool confirm_start = false;
-bool confirm_stop = false;
 
 bool start_mode = true;
 bool selection_mode = false;
@@ -159,14 +137,6 @@ bool test_mode = false;
 bool sub_mode_selection = false;
 bool head_mode = false;
 bool body_mode = false;
-
-bool flowrate_mode_selection = false;
-bool auto_flowrate_mode = false;
-bool manual_flowrate_mode = false;
-bool flowrate_mode_selection_is_done = false;
-
-bool selection_mode_request = false;
-bool operation_mode_request = false;
 
 int fixed_temp = 0;
 
@@ -279,11 +249,11 @@ void print_global_mode() {
 }
 
 void print_area_to_set() {
-  if (main_mode_selection + sub_mode_selection + flowrate_mode_selection > 1) {
+  if (main_mode_selection + sub_mode_selection > 1) {
     Serial.println("ERROR: More than 1 area selected");
   }
   if (selection_mode == true) {
-    if (main_mode_selection + sub_mode_selection + flowrate_mode_selection == 0) {
+    if (main_mode_selection + sub_mode_selection == 0) {
       Serial.print("Area_under_selection: ");
       int val = get_analog_val_3();
       if (val == 1) {
@@ -301,9 +271,6 @@ void print_area_to_set() {
       }
       if (sub_mode_selection == true) {
         Serial.print("Sub_mode in ON;  ");
-      }
-      if (flowrate_mode_selection == true) {
-        Serial.print("Flowrate_mode in ON;  ");
       }
     }
   }
@@ -369,39 +336,12 @@ void print_sub_mode() {
   }
 }
 
-void print_flowrate_mode() {
-  if (auto_flowrate_mode + manual_flowrate_mode > 1) {
-    Serial.println("ERROR: More than 1 flowrate mode selected ");
-  }
-  if (flowrate_mode_selection == true) {
-    if (auto_flowrate_mode + manual_flowrate_mode == 0) {
-      Serial.print("Flowrate_mode_under_selection: ");
-      int val = get_analog_val_2();
-      if (val == 1) {
-        Serial.print("Auto_flowrate_mode");
-      }
-      if (val == 2) {
-        Serial.print("Manual_flowrate_mode");
-      }
-    }
-  } else {
-    if (auto_flowrate_mode + manual_flowrate_mode == 1) {
-      if (auto_flowrate_mode == true) {
-        Serial.print("Auto_flowrate_mode in ON;  ");
-      }
-      if (manual_flowrate_mode == true) {
-        Serial.print("Manual_flowrate_mode in ON;  ");
-      }
-    }
-  }  
-}
 
 void print_mode() {
   print_global_mode();
   print_area_to_set();
   print_main_mode();
   print_sub_mode();
-  print_flowrate_mode();
   Serial.println();
 }
 
@@ -419,41 +359,42 @@ void print_mode() {
 #define selection_speed_table_len 35
 unsigned int selection_speed_table[selection_speed_table_len][3] = { 
   // {SELECTION SPEED, SELECTION DURATION, DELAY DURATION}
-  {2200, 6111, 0}, //0
-  {2150, 5972, 0}, // 1
-  {2100, 5833, 0}, // 2
-  {2050, 5694, 0}, // 3
-  {2000, 5556, 0}, // 4
-  {1950, 5417, 0}, // 5
-  {1900, 5278, 0}, // 6
-  {1850, 5139, 0}, // 7
-  {1800, 5000, 0}, // 8
-  {1750, 4861, 0}, // 9
-  {1700, 4722, 0}, // 10
-  {1650, 4583, 0}, // 11
-  {1600, 4444, 0}, // 12
-  {1550, 4306, 0}, // 13
-  {1500, 4167, 0}, // 14
-  {1450, 4028, 0}, // 15
-  {1400, 3889, 0}, // 16
-  {1350, 3750, 0}, // 17
-  {1300, 3611, 0}, // 18
-  {1250, 3472, 0}, // 19
-  {1200, 3333, 0}, // 20
-  {1150, 3194, 0}, // 21
-  {1100, 3056, 0}, // 22
-  {1050, 2917, 0}, // 23
-  {1000, 2778, 0}, // 24
-  {900, 2500, 0},  // 25
-  {800, 2222, 0},  // 26
-  {700, 1944, 0},  // 27
-  {600, 1667, 0},  // 28
-  {500, 1389, 0},  // 29
-  {400, 1111, 0},  // 30
-  {300, 833, 0},   // 31
-  {250, 603, 0},   // 32
-  {150, 0, 0},   // 33
-  {30, 0, 0}   // 34
+  {2200, 6569, 9100},  //0
+  {2150, 6419, 9150},  //1
+  {2100, 6270, 9185},  //2
+  {2050, 6121, 9205},  //3
+  {2000, 5972, 9225},  //4
+  {1950, 5823, 9250},  //5
+  {1900, 5673, 9270},  //6
+  {1850, 5524, 9290},  //7
+  {1800, 5375, 9305},  //8
+  {1750, 5225, 9315},  //9
+  {1700, 5076, 9325},  //10
+  {1650, 4926, 9337},  //11
+  {1600, 4777, 9350},  //12
+  {1550, 4628, 9368},  //13
+  {1500, 4479, 9375},  //14
+  {1450, 4330, 9385},  //15
+  {1400, 4180, 9393},  //16
+  {1350, 4031, 9424},  //17
+  {1300, 3881, 9443},  //18
+  {1250, 3732, 9450},  //19
+  {1200, 3582, 9463},  //20
+  {1150, 3433, 9475},  //21
+  {1100, 3285, 9485},  //22
+  {1050, 3135, 9485},  //23
+  {1000, 2986, 9518},  //24
+  {900, 2687, 9540},  //25
+  {800, 2388, 9580},  //26
+  {700, 2089, 9605},  //27
+  {600, 1792, 9660},  //28
+  {500, 1493, 9900},  //29
+  {400, 1194, 0},  //30
+  {300, 860, 0},  //31 ver
+  {250, 717, 0},  //32 calc 300
+  {150, 429, 0},  //33 calc 300
+  {30, 86, 0},  //34 calc 300
+
 };
 
 bool under_operation = false;
@@ -471,50 +412,49 @@ bool scenario_test_operation = false;
 unsigned long stabilization_mode_time_started = 0;
 unsigned long stabilization_mode_duration = 180000; // 3 min
 unsigned long operation_time_started = 0;
-unsigned long snabby_head_mode_duration = 5400000; // 1 hr 30 min
+unsigned long snabby_head_mode_duration = 3600000; // 1 hr 00 min
 unsigned long rekt_head_mode_duration = 10800000; // 3hr 00 min
 unsigned long test_mode_duration = 180000; // 3 min
 
 unsigned long test_mode_time_started = 0;
 
 unsigned int temp_fixed = 0;
-int temp_diff_snabb = 10;
+int temp_diff_snabb = 30;
 
 int selection_speed_body = 0;
 int selection_speed_head = 31;
 unsigned int totaly_selected = 0;
 
+int fails_total = 0;
+
 void selection_speed_body_decrease() {
   selection_speed_body ++;
-  lcd_display_selected_speed();
+  lcd_display_selection_speed_body();
 }
 
 void selection_speed_body_increase() {
   selection_speed_body --;
-  lcd_display_selected_speed();
+  lcd_display_selection_speed_body();
 }
 
 
-int find_optimal_selection_speed(int selection_speed_body) {
-  int current_temp = temp_cube.get_avg();
-  for (int i = selection_speed_body; i < 31; i ++) {
-    if (current_temp < selection_speed_table[i][2]) {
-      return i;
-    }
+void find_optimal_selection_speed() {
+  if (temp_cube.get_avg() > selection_speed_table[selection_speed_body][2]) {
+    selection_speed_body_decrease();
   }
 }
 
 void open_upper_valve() {
   digitalWrite(UPPER_VALVE_PIN, 1);
   upper_valve_is_open = true;
-  Serial.print("Valve opened at: ");
+  Serial.print("Upper valve opened at: ");
   Serial.println(current_time);
 }
 
 void close_upper_valve() {
   digitalWrite(UPPER_VALVE_PIN, 0);
   upper_valve_is_open = false;
-  Serial.print("Valve closed at: ");
+  Serial.print("Upper valve closed at: ");
   Serial.println(current_time);
 }
 
@@ -532,20 +472,6 @@ void upper_valve_operation(int speed) {
   }
 }
 
-void open_lower_valve() {
-  digitalWrite(LOWER_VALVE_PIN, 1);
-  lower_valve_is_open = true;
-  Serial.print("Valve opened at: ");
-  Serial.println(current_time);
-}
-
-void close_lower_valve() {
-  digitalWrite(LOWER_VALVE_PIN, 0);
-  lower_valve_is_open = false;
-  Serial.print("Valve closed at: ");
-  Serial.println(current_time);
-}
-
 void lower_valve_operation(int speed) {
   if (stabilization_mode == false) {
     if ((current_time % 30000) < selection_speed_table[speed][1]) {
@@ -560,6 +486,22 @@ void lower_valve_operation(int speed) {
   }
 }
 
+void open_lower_valve() {
+  digitalWrite(LOWER_VALVE_PIN, 1);
+  lower_valve_is_open = true;
+  Serial.print("Lower valve opened at: ");
+  Serial.println(current_time);
+}
+
+void close_lower_valve() {
+  digitalWrite(LOWER_VALVE_PIN, 0);
+  lower_valve_is_open = false;
+  Serial.print("Lower valve closed at: ");
+  Serial.println(current_time);
+}
+
+
+
 void turn_on_stabilization_mode() {
   if (stabilization_mode == false) {
     close_upper_valve();
@@ -568,15 +510,15 @@ void turn_on_stabilization_mode() {
     under_operation = false;
     stabilization_mode = true;
     stabilization_mode_time_started = current_time;
+    fails_total++;
+    lcd_display_fails_total();
     lcd_display_stabilization_mode();  
   }
 }
 
 void turn_off_stabilization_mode() {
   if (stabilization_mode == true) {
-    Serial.println("here 1");
     if (temp_in_pipe_more_than_fixed() == false) {
-      Serial.println("here 2");
       if (current_time - stabilization_mode_time_started > stabilization_mode_duration) {
         Serial.println("stabilization_mode is off");
         under_operation = true;
@@ -650,7 +592,7 @@ void scenario_snabby_body() {
     Serial.println("scenario_snabby_body started");
     lcd_set_display_in_operation_update();
   }
-  // selection_speed_body = find_optimal_selection_speed(selection_speed_body);
+  find_optimal_selection_speed();
   check_temp_and_start_stabilization_mode_if_temp_not_ok();
   if (temp_cube.get_avg() < 9900) {
     upper_valve_operation(selection_speed_body);
@@ -693,7 +635,7 @@ void scenario_rekt_body() {
     selection_speed_head = selection_speed_table_len - 1;
     lcd_set_display_in_operation_update();
   }
-  selection_speed_body = find_optimal_selection_speed(selection_speed_body);
+  find_optimal_selection_speed();
   check_temp_and_start_stabilization_mode_if_temp_not_ok();
   if (temp_cube.get_avg() < 9600) {
     upper_valve_operation(selection_speed_head);
@@ -765,9 +707,6 @@ void operation() {
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-// инициализируем дисплеи
-LiquidCrystal_I2C lcd(0x27, 20, 4);
-
 // показать температуру на дисплеях
 unsigned long last_time_display_upd = 0;
 int general_blink_delay = 2000;
@@ -775,13 +714,37 @@ int selection_in_menu_blink_delay = general_blink_delay / 2;
 int selection_blink_delay = selection_in_menu_blink_delay / 2;
 
 
-#define lcd_main_mode_coordinates 11, 0
-#define lcd_sub_mode_coordinates 11, 1
-#define lcd_selection_speed_coordinates 11, 3
+
 #define lcd_operation_status_coordinates 5, 0
 #define lcd_stabilization_status_coordinates 5, 1
 #define lcd_temp_pipe_coordinates 5, 2
 #define lcd_temp_cube_coordindates 5, 3
+
+#define lcd_main_mode_coordinates 0, 0
+#define lcd_sub_mode_coordinates 0, 1
+#define lcd_selection_speed_head_coordinates 0, 2
+#define lcd_selection_speed_body_coordinates 0, 3
+
+#define lcd_temp_fixed_coordinates 12, 2
+#define lcd_temp_diff_coordinates 12, 1
+#define lcd_fails_coordinates 12, 0
+
+void lcd_display_fails_total() {
+  lcd.setCursor(lcd_fails_coordinates);
+  lcd.print(fails_total);
+}
+
+void lcd_display_temp_diff() {
+  lcd.setCursor(lcd_temp_diff_coordinates);
+  lcd.print(return_temp_diff_fact());
+}
+
+void lcd_display_temp_fixed() {
+  lcd.setCursor(lcd_temp_fixed_coordinates);
+  lcd.print(temp_fixed / 100);
+  lcd.print(",");
+  lcd.print(temp_fixed % 100);
+}
 
 void lcd_display_main_mode_in_operation() {
   lcd.setCursor(lcd_main_mode_coordinates);
@@ -800,12 +763,16 @@ void lcd_display_stabilization_mode() {
 
 void lcd_display_temp_pipe() {
   lcd.setCursor(lcd_temp_pipe_coordinates);
-  lcd.print(temp_pipe.get_avg());
+  lcd.print(temp_pipe.get_avg() / 100);
+  lcd.print(",");
+  lcd.print(temp_pipe.get_avg() % 100);
 }
 
 void lcd_display_temp_cube() {
   lcd.setCursor(lcd_temp_cube_coordindates);
-  lcd.print(temp_cube.get_avg());
+  lcd.print(temp_cube.get_avg() / 100);
+  lcd.print(",");
+  lcd.print(temp_cube.get_avg() % 100);
 }
 
 void lcd_set_display_in_operation_general() {
@@ -814,33 +781,26 @@ void lcd_set_display_in_operation_general() {
   lcd_display_operation_status();
 }
 
-void lcd_set_display_in_selection_general() {
-  lcd.setCursor(lcd_main_mode_coordinates);
-  lcd.print("    ");
-  lcd.setCursor(lcd_sub_mode_coordinates);
-  lcd.print("    ");
-  lcd.setCursor(lcd_selection_speed_coordinates);
-  lcd.print("    ");
-  lcd.setCursor(lcd_operation_status_coordinates);
-  lcd.print("     ");
-  lcd.setCursor(lcd_stabilization_status_coordinates);
-  lcd.print("     ");
-  lcd.setCursor(lcd_temp_pipe_coordinates);
-  lcd.print("     ");
-  lcd.setCursor(lcd_temp_cube_coordindates);
-  lcd.print("     ");
+void clear_display() {
+  for (int i = 0; i < 4; i++) {
+    lcd.setCursor(0, i);
+    lcd.print("                    ");
+  }
 }
 
 void lcd_set_display_in_operation_update() {
-  lcd_display_selected_speed();
+  lcd_display_selection_speed_head();
+  lcd_display_selection_speed_body();
   lcd_display_operation_status();
   lcd_display_stabilization_mode();
+  lcd_display_temp_fixed();
 }
 
 void lcd_display_temperatures() {
   if (operation_mode == true) {
     lcd_display_temp_pipe();
     lcd_display_temp_cube();
+    lcd_display_temp_diff();
   }
 }
 
@@ -862,10 +822,16 @@ void lcd_display_main_mode_in_selection() {
 }
 
 void lcd_display_data() {
-  if (current_time - last_time_display_upd > 100) {
-    lcd_update_data_in_selection();
-    lcd_display_temperatures();
-    last_time_display_upd = current_time;
+  if (selection_mode == true) {
+    if (current_time - last_time_display_upd > 100) {
+      lcd_update_data_in_selection();
+      last_time_display_upd = current_time;
+    }
+  } else if (operation_mode == true) {
+    if (current_time - last_time_display_upd > 750) {
+      lcd_display_temperatures();
+      last_time_display_upd = current_time;
+    }
   }
 }
 
@@ -905,34 +871,36 @@ String lcd_05_01_Stab_status_text() {
   return "     ";
 }
 
-void lcd_display_selection_speed_in_start_and_select() {
-  lcd.setCursor(lcd_selection_speed_coordinates);
-  lcd.print("    ");
-}
-
-void lcd_display_selection_speed_in_opration(int selection_speed) {
-  if (selection_speed_table[selection_speed][0] < 1000) {
-    lcd.setCursor(lcd_selection_speed_coordinates);
-    lcd.print(" ");
-    lcd.print(selection_speed_table[selection_speed][0]);
-  } else {
-    lcd.setCursor(lcd_selection_speed_coordinates);
-    lcd.print(selection_speed_table[selection_speed][0]);
-  }
-}
-
-void lcd_display_selected_speed() {
-  if (start_mode == true or selection_mode == true) {
-    lcd_display_selection_speed_in_start_and_select();
-  } else if (operation_mode == true) {
-    if (body_mode == true) {
-      lcd_display_selection_speed_in_opration(selection_speed_body);
-    } else if (head_mode == true) {
-      lcd_display_selection_speed_in_opration(selection_speed_head);
+void lcd_display_selection_speed_head() {
+  lcd.setCursor(lcd_selection_speed_head_coordinates);
+  if (head_mode == true or rekt_mode == true) {
+    if (selection_speed_table[selection_speed_head][0] < 100) {
+      lcd.print("  ");
+      lcd.print(selection_speed_table[selection_speed_head][0]);
+    } else if (selection_speed_table[selection_speed_head][0] < 1000) {
+      lcd.print(" ");
+      lcd.print(selection_speed_table[selection_speed_head][0]);
+    } else {
+      lcd.print(selection_speed_table[selection_speed_head][0]);
     }
+  } else {
+    lcd.print("----");
   }
 }
 
+void lcd_display_selection_speed_body() {
+  lcd.setCursor(lcd_selection_speed_body_coordinates);
+  if (body_mode == true) {
+    if (selection_speed_table[selection_speed_body][0] < 1000) {
+      lcd.print(" ");
+      lcd.print(selection_speed_table[selection_speed_body][0]);
+    } else {
+      lcd.print(selection_speed_table[selection_speed_body][0]);
+    }
+  } else {
+    lcd.print("----");
+  }
+}
 
 String lcd_00_00_selected_mode_text() {
   if (rekt_mode == true) {
@@ -1031,7 +999,7 @@ void single_click() {
 }
 
 void service_single_click() {
-  if (selection_speed_body < (selection_speed_table_len)) {
+  if (selection_speed_body < selection_speed_table_len) {
     selection_speed_body_decrease();
   } 
 }
@@ -1084,13 +1052,64 @@ void change_global_mode() {
     confirm_start = false;
     close_lower_valve();
     close_upper_valve();
-    lcd_set_display_in_selection_general();
+    clear_display();
   }
   // если находимся в режиме настройки, то повторное удержание переведет в режим работы
   else {
     operation_mode_turn_on();   
   }
 }
+
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+//                                                                               ALARM SCRYPTS
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#define ALARM_PIN A2
+bool speaker_is_on = false;
+
+unsigned long last_time_alarm = 0; 
+
+void speaker_turn_on() {
+  speaker_is_on = true;
+  digitalWrite(ALARM_PIN, 1);
+}
+
+void speaker_turn_off() {
+  speaker_is_on = false;
+  digitalWrite(ALARM_PIN, 0);
+}
+
+#define alarm_2000_1000_durations 2000, 1000
+#define alarm_500_500_duration 500, 500
+#define alarm_1000_1000_duration 1000, 1000
+
+void alarm_stab() {
+  alarm_general(alarm_2000_1000_durations);
+}
+
+void alarm_
+
+void alarm_general (int sound_duration, int silence_duration) {
+  if (speaker_is_on == true) {
+    if (last_time_alarm > sound_duration) {
+      speaker_turn_off();
+      last_time_alarm = current_time;
+    }
+  } else {
+    if (last_time_alarm > silence_duration) {
+      speaker_turn_on();
+      last_time_alarm = current_time;
+    }
+  }
+}
+
+
+
+
 
 void setup() {
 
@@ -1123,8 +1142,8 @@ void loop() {
   main_button.tick();
   service_button.tick();
   operation();
-  write_temp_to_storage();
-  request_temp_all();
+  write_temp_and_request_new();
   change_mode();
   lcd_display_data();
+  alarm(alarm_2_1_durations);
 }

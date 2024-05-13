@@ -5,15 +5,27 @@
 #include <LiquidCrystal_I2C.h>
 
 #define DS_PIN 2  // пин для термометров
-#define DS_SENSOR_AMOUNT 4  //кол-во датчиков
+#define MAIN_BUTTON_PIN 10 // пин основной кнопки
+#define SERVICE_BUTTON_PIN 11 // пин сервисной кнопки
+#define UPPER_VALVE_PIN A0 // пин управления клапаном верхним
+#define LOWER_VALVE_PIN A1 // пин управления клапаном нижним
+#define ANALOG_MODE_PIN A7 // пин для крутилки режима
 
-// инициализируем дисплеи
+// инициализируем LCD дисплей
 LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+// инициализируем кнопки
+OneButton main_button(MAIN_BUTTON_PIN);
+OneButton service_button(SERVICE_BUTTON_PIN);
+
+// инициализируем датчики температуры
+#define DS_SENSOR_AMOUNT 4  //кол-во датчиков
+MicroDS18B20<DS_PIN, DS_ADDR_MODE> sensor[DS_SENSOR_AMOUNT];
+
 
 unsigned long current_time = 0;
 
-// объявляем датчики температуры
-MicroDS18B20<DS_PIN, DS_ADDR_MODE> sensor[DS_SENSOR_AMOUNT];
+
 // адреса датчиков
 uint8_t temp_sensors_addr[][8] = {
   {0x28, 0xDB, 0x85, 0x45, 0xD4, 0x61, 0x68, 0xE4},  // 3m 1 
@@ -113,12 +125,7 @@ void write_temp_and_request_new() {
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-#define MAIN_BUTTON_PIN 10
-#define SERVICE_BUTTON_PIN 11
-#define ANALOG_MODE_PIN A7     // пин для крутилки режима
 
-OneButton main_button(MAIN_BUTTON_PIN);
-OneButton service_button(SERVICE_BUTTON_PIN);
 
 
 //  управление режимами
@@ -353,49 +360,83 @@ void print_mode() {
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-#define UPPER_VALVE_PIN A0
-#define LOWER_VALVE_PIN A1
+
 
 #define selection_speed_table_len 35
 unsigned int selection_speed_table[selection_speed_table_len][3] = { 
   // {SELECTION SPEED, SELECTION DURATION, DELAY DURATION}
-  {2200, 6569, 9100},  //0
-  {2150, 6419, 9150},  //1
-  {2100, 6270, 9185},  //2
-  {2050, 6121, 9205},  //3
-  {2000, 5972, 9225},  //4
-  {1950, 5823, 9250},  //5
-  {1900, 5673, 9270},  //6
-  {1850, 5524, 9290},  //7
-  {1800, 5375, 9305},  //8
-  {1750, 5225, 9315},  //9
-  {1700, 5076, 9325},  //10
-  {1650, 4926, 9337},  //11
-  {1600, 4777, 9350},  //12
-  {1550, 4628, 9368},  //13
-  {1500, 4479, 9375},  //14
-  {1450, 4330, 9385},  //15
-  {1400, 4180, 9393},  //16
+  {2200, 6569, 9125},  //0
+  {2150, 6419, 9167},  //1
+  {2100, 6270, 9195},  //2
+  {2050, 6121, 9215},  //3
+  {2000, 5972, 9237},  //4
+  {1950, 5823, 9260},  //5
+  {1900, 5673, 9280},  //6
+  {1850, 5524, 9297},  //7
+  {1800, 5375, 9310},  //8
+  {1750, 5225, 9320},  //9
+  {1700, 5076, 9331},  //10
+  {1650, 4926, 9343},  //11
+  {1600, 4777, 9359},  //12
+  {1550, 4628, 9371},  //13
+  {1500, 4479, 9380},  //14
+  {1450, 4330, 9392},  //15
+  {1400, 4180, 9404},  //16
   {1350, 4031, 9424},  //17
-  {1300, 3881, 9443},  //18
+  {1300, 3881, 9444},  //18
   {1250, 3732, 9450},  //19
-  {1200, 3582, 9463},  //20
+  {1200, 3582, 9464},  //20
   {1150, 3433, 9475},  //21
   {1100, 3285, 9485},  //22
   {1050, 3135, 9485},  //23
-  {1000, 2986, 9518},  //24
+  {1000, 2986, 9519},  //24
   {900, 2687, 9540},  //25
   {800, 2388, 9580},  //26
   {700, 2089, 9605},  //27
   {600, 1792, 9660},  //28
   {500, 1493, 9900},  //29
   {400, 1194, 0},  //30
-  {300, 860, 0},  //31 ver
-  {250, 717, 0},  //32 calc 300
-  {150, 429, 0},  //33 calc 300
-  {30, 86, 0},  //34 calc 300
-
+  {300, 860, 0},  //31
+  {250, 717, 0},  //32
+  {150, 429, 0},  //33
+  {30, 86, 0},  //34
 };
+
+  // {2200, 6569, 9100},  //0
+  // {2150, 6419, 9150},  //1
+  // {2100, 6270, 9185},  //2
+  // {2050, 6121, 9205},  //3
+  // {2000, 5972, 9225},  //4
+  // {1950, 5823, 9250},  //5
+  // {1900, 5673, 9270},  //6
+  // {1850, 5524, 9290},  //7
+  // {1800, 5375, 9305},  //8
+  // {1750, 5225, 9315},  //9
+  // {1700, 5076, 9325},  //10
+  // {1650, 4926, 9337},  //11
+  // {1600, 4777, 9350},  //12
+  // {1550, 4628, 9368},  //13
+  // {1500, 4479, 9375},  //14
+  // {1450, 4330, 9385},  //15
+  // {1400, 4180, 9393},  //16
+  // {1350, 4031, 9424},  //17
+  // {1300, 3881, 9443},  //18
+  // {1250, 3732, 9450},  //19
+  // {1200, 3582, 9463},  //20
+  // {1150, 3433, 9475},  //21
+  // {1100, 3285, 9485},  //22
+  // {1050, 3135, 9485},  //23
+  // {1000, 2986, 9518},  //24
+  // {900, 2687, 9540},  //25
+  // {800, 2388, 9580},  //26
+  // {700, 2089, 9605},  //27
+  // {600, 1792, 9660},  //28
+  // {500, 1493, 9900},  //29
+  // {400, 1194, 0},  //30
+  // {300, 860, 0},  //31 ver
+  // {250, 717, 0},  //32 calc 300
+  // {150, 429, 0},  //33 calc 300
+  // {30, 86, 0},  //34 calc 300
 
 bool under_operation = false;
 bool stabilization_mode = false;
@@ -427,9 +468,22 @@ unsigned int totaly_selected = 0;
 
 int fails_total = 0;
 
+void update_temp_fixed() {
+  temp_fixed = temp_pipe.get_avg();
+}
+
+void update_temp_fixed_at_90() {
+  if (temp_cube.get_avg() > 9000 and temp_cube.get_avg() < 9010) {
+    update_temp_fixed();
+  }
+  lcd_display_temp_fixed();
+}
+
 void selection_speed_body_decrease() {
-  selection_speed_body ++;
-  lcd_display_selection_speed_body();
+  if (selection_speed_body < 29) {
+    selection_speed_body ++;
+    lcd_display_selection_speed_body();
+  }
 }
 
 void selection_speed_body_increase() {
@@ -580,12 +634,13 @@ void scenario_snabby_head() {
     confirm_start = false;
     scenario_snabby_head_operation = false;
     under_operation = false;
+    lcd_set_display_in_operation_update();
   }
 }
 
 void scenario_snabby_body() {
   if (scenario_snabby_body_operation == false) {
-    temp_fixed = temp_pipe.get_avg();
+    update_temp_fixed();
     scenario_snabby_body_operation = true;
     under_operation = true;
     selection_speed_body = 0;
@@ -593,6 +648,7 @@ void scenario_snabby_body() {
     lcd_set_display_in_operation_update();
   }
   find_optimal_selection_speed();
+  update_temp_fixed_at_90();
   check_temp_and_start_stabilization_mode_if_temp_not_ok();
   if (temp_cube.get_avg() < 9900) {
     upper_valve_operation(selection_speed_body);
@@ -602,6 +658,7 @@ void scenario_snabby_body() {
     confirm_start = false;
     scenario_snabby_body_operation = false;
     under_operation = false;
+    lcd_set_display_in_operation_update();
   }
 }
 
@@ -622,12 +679,13 @@ void scenario_rekt_head() {
     confirm_start = false;
     scenario_rekt_head_operation = false;
     under_operation = false;
+    lcd_set_display_in_operation_update();
   }
 }
 
 void scenario_rekt_body() {
   if (scenario_rekt_body_operation == false) {
-    temp_fixed = temp_pipe.get_avg();
+    update_temp_fixed();
     scenario_rekt_body_operation = true;
     under_operation = true;
     selection_speed_body = 0;
@@ -636,6 +694,7 @@ void scenario_rekt_body() {
     lcd_set_display_in_operation_update();
   }
   find_optimal_selection_speed();
+  update_temp_fixed_at_90();
   check_temp_and_start_stabilization_mode_if_temp_not_ok();
   if (temp_cube.get_avg() < 9600) {
     upper_valve_operation(selection_speed_head);
@@ -647,6 +706,7 @@ void scenario_rekt_body() {
     confirm_start = false;
     scenario_snabby_body_operation = false;
     under_operation = false;
+    lcd_set_display_in_operation_update();
   }
 }
 
@@ -729,14 +789,30 @@ int selection_blink_delay = selection_in_menu_blink_delay / 2;
 #define lcd_temp_diff_coordinates 12, 1
 #define lcd_fails_coordinates 12, 0
 
+void lcd_display_start_screeen() {
+  lcd.setCursor(7, 1);
+  lcd.print("START MODE");
+  lcd.setCursor(6, 2);
+  lcd.print("Hold SELECT");
+}
+
 void lcd_display_fails_total() {
   lcd.setCursor(lcd_fails_coordinates);
   lcd.print(fails_total);
 }
 
 void lcd_display_temp_diff() {
-  lcd.setCursor(lcd_temp_diff_coordinates);
-  lcd.print(return_temp_diff_fact());
+  if (body_mode == true) {
+    if (under_operation == true or stabilization_mode == true) {
+      if (return_temp_diff_fact() >= 0 or return_temp_diff_fact() < 100) {
+        lcd.setCursor(lcd_temp_diff_coordinates);
+        if (return_temp_diff_fact() < 10) {
+          lcd.print(" ");
+        }
+        lcd.print(return_temp_diff_fact());
+      }
+    }
+  }
 }
 
 void lcd_display_temp_fixed() {
@@ -763,15 +839,27 @@ void lcd_display_stabilization_mode() {
 
 void lcd_display_temp_pipe() {
   lcd.setCursor(lcd_temp_pipe_coordinates);
+  if (temp_pipe.get_avg() % 100 < 10) {
+    lcd.print(" ");
+    }
   lcd.print(temp_pipe.get_avg() / 100);
   lcd.print(",");
+  if (temp_pipe.get_avg() % 100 < 10) {
+    lcd.print(0);
+    }
   lcd.print(temp_pipe.get_avg() % 100);
 }
 
 void lcd_display_temp_cube() {
   lcd.setCursor(lcd_temp_cube_coordindates);
+  if (temp_cube.get_avg() % 100 < 10) {
+    lcd.print(" ");
+    }
   lcd.print(temp_cube.get_avg() / 100);
   lcd.print(",");
+  if (temp_cube.get_avg() % 100 < 10) {
+    lcd.print(0);
+    }
   lcd.print(temp_cube.get_avg() % 100);
 }
 
@@ -1060,57 +1148,6 @@ void change_global_mode() {
   }
 }
 
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-//                                                                               ALARM SCRYPTS
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-#define ALARM_PIN A2
-bool speaker_is_on = false;
-
-unsigned long last_time_alarm = 0; 
-
-void speaker_turn_on() {
-  speaker_is_on = true;
-  digitalWrite(ALARM_PIN, 1);
-}
-
-void speaker_turn_off() {
-  speaker_is_on = false;
-  digitalWrite(ALARM_PIN, 0);
-}
-
-#define alarm_2000_1000_durations 2000, 1000
-#define alarm_500_500_duration 500, 500
-#define alarm_1000_1000_duration 1000, 1000
-
-void alarm_stab() {
-  alarm_general(alarm_2000_1000_durations);
-}
-
-void alarm_
-
-void alarm_general (int sound_duration, int silence_duration) {
-  if (speaker_is_on == true) {
-    if (last_time_alarm > sound_duration) {
-      speaker_turn_off();
-      last_time_alarm = current_time;
-    }
-  } else {
-    if (last_time_alarm > silence_duration) {
-      speaker_turn_on();
-      last_time_alarm = current_time;
-    }
-  }
-}
-
-
-
-
-
 void setup() {
 
   // pinMode(A6, INPUT);
@@ -1135,6 +1172,8 @@ void setup() {
   main_button.attachClick(single_click);
   service_button.attachClick(service_single_click);
   service_button.attachDoubleClick(service_double_click);
+
+  lcd_display_start_screeen();
 }
 
 void loop() {
@@ -1145,5 +1184,4 @@ void loop() {
   write_temp_and_request_new();
   change_mode();
   lcd_display_data();
-  alarm(alarm_2_1_durations);
 }

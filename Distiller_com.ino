@@ -24,12 +24,12 @@ MicroDS18B20<DS_PIN, DS_ADDR_MODE> sensor[DS_SENSOR_AMOUNT];
 
 
 unsigned long current_time = 0;
-
+bool error_mode = false;
 
 // адреса датчиков
 uint8_t temp_sensors_addr[][8] = {
-  {0x28, 0xDB, 0x85, 0x45, 0xD4, 0x61, 0x68, 0xE4},  // 3m 1 
-  {0x28, 0x92, 0x8E, 0x45, 0xD4, 0x7A, 0x43, 0xBB},
+  {0x28, 0xC2, 0x9A, 0x80, 0xE3, 0xE1, 0x3C, 0xB3},  // 3m 1 
+  {0x28, 0xFA, 0xE3, 0x80, 0xE3, 0xE1, 0x3C, 0x61},
   {0x28, 0x16, 0x5C, 0x80, 0xE3, 0xE1, 0x3C, 0x15},  //6
   {0x28, 0x12, 0x8B, 0x80, 0xE3, 0xE1, 0x3C, 0xC6},  //7
   {0x28, 0xC2, 0x9A, 0x80, 0xE3, 0xE1, 0x3C, 0xB3},  //8
@@ -101,12 +101,35 @@ void request_temp_all() {
   }
 }
 
+void turn_on_error_mode() {
+  if (error_mode == false) {
+    error_mode = true;
+  }
+}
+
+void turn_off_error_mode() {
+  if (error_mode == true) {
+    error_mode = false;
+  }
+}
+
 // записываем температуры в обработчик в указанный период
 void write_temp_to_storage() {
-  int temp = sensor[0].getTemp() * 100;
-  temp_cube.add_value(temp);
-  temp = sensor[1].getTemp() * 100;
-  temp_pipe.add_value(temp);
+  if (sensor[0].readTemp() == true) {
+    turn_off_error_mode();
+    int temp = sensor[0].getTemp() * 100;
+    temp += 100;
+    temp_cube.add_value(temp);
+  } else {
+    turn_on_error_mode();
+  }
+  if (sensor[1].readTemp() == true) {
+    turn_off_error_mode();
+    int temp = sensor[1].getTemp() * 100;
+    temp_pipe.add_value(temp);
+  } else {
+    turn_on_error_mode();
+  }  
 }
 
 void write_temp_and_request_new() {
@@ -472,8 +495,8 @@ void update_temp_fixed() {
   temp_fixed = temp_pipe.get_avg();
 }
 
-void update_temp_fixed_at_90() {
-  if (temp_cube.get_avg() > 9000 and temp_cube.get_avg() < 9010) {
+void update_temp_fixed_at_91() {
+  if (temp_cube.get_avg() > 9100 and temp_cube.get_avg() < 9110) {
     update_temp_fixed();
   }
   lcd_display_temp_fixed();
@@ -647,18 +670,22 @@ void scenario_snabby_body() {
     Serial.println("scenario_snabby_body started");
     lcd_set_display_in_operation_update();
   }
-  find_optimal_selection_speed();
-  update_temp_fixed_at_90();
-  check_temp_and_start_stabilization_mode_if_temp_not_ok();
-  if (temp_cube.get_avg() < 9900) {
-    upper_valve_operation(selection_speed_body);
+  if (error_mode == false) {
+    find_optimal_selection_speed();
+    update_temp_fixed_at_91();
+    check_temp_and_start_stabilization_mode_if_temp_not_ok();
+    if (temp_cube.get_avg() < 9900) {
+      upper_valve_operation(selection_speed_body);
+    } else {
+      close_upper_valve();
+      finished = true;
+      confirm_start = false;
+      scenario_snabby_body_operation = false;
+      under_operation = false;
+      lcd_set_display_in_operation_update();
+    }
   } else {
     close_upper_valve();
-    finished = true;
-    confirm_start = false;
-    scenario_snabby_body_operation = false;
-    under_operation = false;
-    lcd_set_display_in_operation_update();
   }
 }
 
@@ -693,20 +720,25 @@ void scenario_rekt_body() {
     selection_speed_head = selection_speed_table_len - 1;
     lcd_set_display_in_operation_update();
   }
-  find_optimal_selection_speed();
-  update_temp_fixed_at_90();
-  check_temp_and_start_stabilization_mode_if_temp_not_ok();
-  if (temp_cube.get_avg() < 9600) {
-    upper_valve_operation(selection_speed_head);
-    lower_valve_operation(selection_speed_body);
+  if (error_mode == false) {
+    find_optimal_selection_speed();
+    update_temp_fixed_at_91();
+    check_temp_and_start_stabilization_mode_if_temp_not_ok();
+    if (temp_cube.get_avg() < 9600) {
+      upper_valve_operation(selection_speed_head);
+      lower_valve_operation(selection_speed_body);
+    } else {
+      close_lower_valve();
+      close_upper_valve();
+      finished = true;
+      confirm_start = false;
+      scenario_snabby_body_operation = false;
+      under_operation = false;
+      lcd_set_display_in_operation_update();
+    }
   } else {
     close_lower_valve();
     close_upper_valve();
-    finished = true;
-    confirm_start = false;
-    scenario_snabby_body_operation = false;
-    under_operation = false;
-    lcd_set_display_in_operation_update();
   }
 }
 
@@ -838,20 +870,25 @@ void lcd_display_stabilization_mode() {
 }
 
 void lcd_display_temp_pipe() {
-  lcd.setCursor(lcd_temp_pipe_coordinates);
-  if (temp_pipe.get_avg() % 100 < 10) {
-    lcd.print(" ");
-    }
-  lcd.print(temp_pipe.get_avg() / 100);
-  lcd.print(",");
-  if (temp_pipe.get_avg() % 100 < 10) {
-    lcd.print(0);
-    }
-  lcd.print(temp_pipe.get_avg() % 100);
+  lcd.setCursor(lcd_temp_pipe_coordinates); 
+  if (error_mode == false) {
+    if (temp_pipe.get_avg() % 100 < 10) {
+      lcd.print(" ");
+      }
+    lcd.print(temp_pipe.get_avg() / 100);
+    lcd.print(",");
+    if (temp_pipe.get_avg() % 100 < 10) {
+      lcd.print(0);
+      }
+    lcd.print(temp_pipe.get_avg() % 100);
+  } else {
+    lcd.print("Error");
+  }
 }
 
 void lcd_display_temp_cube() {
   lcd.setCursor(lcd_temp_cube_coordindates);
+  if (error_mode == false) {
   if (temp_cube.get_avg() % 100 < 10) {
     lcd.print(" ");
     }
@@ -861,6 +898,9 @@ void lcd_display_temp_cube() {
     lcd.print(0);
     }
   lcd.print(temp_cube.get_avg() % 100);
+  } else {
+    lcd.print("Error");
+  }
 }
 
 void lcd_set_display_in_operation_general() {
@@ -1184,4 +1224,10 @@ void loop() {
   write_temp_and_request_new();
   change_mode();
   lcd_display_data();
+  lcd.setCursor(15, 3);
+  if (error_mode == true) {
+    lcd.print("error");
+  } else {
+    lcd.print("ookkk");
+  }
 }

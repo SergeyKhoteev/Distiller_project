@@ -385,8 +385,8 @@ void print_mode() {
 
 
 
-#define selection_speed_table_len 35
-unsigned int selection_speed_table[selection_speed_table_len][3] = { 
+#define upper_valve_selection_speed_table_len 35
+unsigned int upper_valve_selection_speed_table[upper_valve_selection_speed_table_len][3] = { 
   // {SELECTION SPEED, SELECTION DURATION, DELAY DURATION}
   {2200, 6569, 9125},  //0
   {2150, 6419, 9167},  //1
@@ -420,46 +420,87 @@ unsigned int selection_speed_table[selection_speed_table_len][3] = {
   {500, 1493, 9900},  //29
   {400, 1194, 0},  //30
   {300, 860, 0},  //31
-  {250, 717, 0},  //32
+  {200, 574, 0},  //32
   {150, 429, 0},  //33
   {30, 86, 0},  //34
 };
 
-  // {2200, 6569, 9100},  //0
-  // {2150, 6419, 9150},  //1
-  // {2100, 6270, 9185},  //2
-  // {2050, 6121, 9205},  //3
-  // {2000, 5972, 9225},  //4
-  // {1950, 5823, 9250},  //5
-  // {1900, 5673, 9270},  //6
-  // {1850, 5524, 9290},  //7
-  // {1800, 5375, 9305},  //8
-  // {1750, 5225, 9315},  //9
-  // {1700, 5076, 9325},  //10
-  // {1650, 4926, 9337},  //11
-  // {1600, 4777, 9350},  //12
-  // {1550, 4628, 9368},  //13
-  // {1500, 4479, 9375},  //14
-  // {1450, 4330, 9385},  //15
-  // {1400, 4180, 9393},  //16
+
+#define lower_valve_selection_speed_table_len 36
+unsigned int lower_valve_selection_speed_table[lower_valve_selection_speed_table_len][3] = { 
+  // {SELECTION SPEED, SELECTION DURATION, DELAY DURATION}
+  {2500, 3287, 9000}, //0 tbd 1
+  {2450, 3221, 9001}, //1
+  {2400, 3156, 9002}, //2 true
+  {2350, 3127, 9003}, //3
+  {2300, 3078, 9004}, //4 
+  {2250, 3030, 9050}, //5 tbd 1
+  {2200, 2997, 9125}, //6
+  {2150, 2946, 9167}, //7
+  {2100, 2895, 9195}, //8 tbd 1
+  {2050, 2857, 9215}, //9
+  {2000, 2788, 9237}, //10
+  {1950, 2750, 9260}, //11 tbd 1
+  {1900, 2694, 9280}, //12
+  {1850, 2639, 9297}, //13
+  {1800, 2582, 9310}, //14
+  {1750, 2525, 9320}, //15 true
+  {1700, 2503, 9331}, //16
+  {1650, 2430, 9343}, //17
+  {1600, 2404, 9359}, //18 tbd 1
+  {1550, 2352, 9371}, //19
+  {1500, 2299, 9380}, //20
+  {1450, 2244, 9392}, //21
+  {1400, 2188, 9404}, //22 tbd 1
+  {1350, 2150, 9424}, //23
+  {1300, 2070, 9444}, //24
+  {1250, 2028, 9450}, //25 tbd 1
+  {1200, 1964, 9464}, //26
+  {1150, 1900, 9475}, //27
+  {1100, 1834, 9485}, //28
+  {1050, 1767, 9485}, //29 true
+  {1000, 1712, 9519}, //30
+  {900, 1658, 9540}, //31
+  {800, 1418, 9580}, //32
+  {700, 1262, 9605}, //33 true
+  {600, 1082, 9660}, //34
+  {500, 901, 9900}, //35 tbd 1
+};
+  // {2200, 6569, 9125},  //0
+  // {2150, 6419, 9167},  //1
+  // {2100, 6270, 9195},  //2
+  // {2050, 6121, 9215},  //3
+  // {2000, 5972, 9237},  //4
+  // {1950, 5823, 9260},  //5
+  // {1900, 5673, 9280},  //6
+  // {1850, 5524, 9297},  //7
+  // {1800, 5375, 9310},  //8
+  // {1750, 5225, 9320},  //9
+  // {1700, 5076, 9331},  //10
+  // {1650, 4926, 9343},  //11
+  // {1600, 4777, 9359},  //12
+  // {1550, 4628, 9371},  //13
+  // {1500, 4479, 9380},  //14
+  // {1450, 4330, 9392},  //15
+  // {1400, 4180, 9404},  //16
   // {1350, 4031, 9424},  //17
-  // {1300, 3881, 9443},  //18
+  // {1300, 3881, 9444},  //18
   // {1250, 3732, 9450},  //19
-  // {1200, 3582, 9463},  //20
+  // {1200, 3582, 9464},  //20
   // {1150, 3433, 9475},  //21
   // {1100, 3285, 9485},  //22
   // {1050, 3135, 9485},  //23
-  // {1000, 2986, 9518},  //24
+  // {1000, 2986, 9519},  //24
   // {900, 2687, 9540},  //25
   // {800, 2388, 9580},  //26
   // {700, 2089, 9605},  //27
   // {600, 1792, 9660},  //28
   // {500, 1493, 9900},  //29
   // {400, 1194, 0},  //30
-  // {300, 860, 0},  //31 ver
-  // {250, 717, 0},  //32 calc 300
-  // {150, 429, 0},  //33 calc 300
-  // {30, 86, 0},  //34 calc 300
+  // {300, 860, 0},  //31
+  // {250, 717, 0},  //32
+  // {150, 429, 0},  //33
+  // {30, 86, 0},  //34temp_diff
 
 bool under_operation = false;
 bool stabilization_mode = false;
@@ -478,12 +519,13 @@ unsigned long stabilization_mode_duration = 180000; // 3 min
 unsigned long operation_time_started = 0;
 unsigned long snabby_head_mode_duration = 3600000; // 1 hr 00 min
 unsigned long rekt_head_mode_duration = 10800000; // 3hr 00 min
-unsigned long test_mode_duration = 180000; // 3 min
+unsigned long test_mode_duration = 540000; // 9 min
 
 unsigned long test_mode_time_started = 0;
 
 unsigned int temp_fixed = 0;
-int temp_diff_snabb = 30;
+int temp_diff = 0;
+int decrease_lim = 0;
 
 int selection_speed_body = 0;
 int selection_speed_head = 31;
@@ -503,7 +545,7 @@ void update_temp_fixed_at_91() {
 }
 
 void selection_speed_body_decrease() {
-  if (selection_speed_body < 29) {
+  if (selection_speed_body < decrease_lim) {
     selection_speed_body ++;
     lcd_display_selection_speed_body();
   }
@@ -516,8 +558,15 @@ void selection_speed_body_increase() {
 
 
 void find_optimal_selection_speed() {
-  if (temp_cube.get_avg() > selection_speed_table[selection_speed_body][2]) {
-    selection_speed_body_decrease();
+  if (snab_mode == true) {
+    if (temp_cube.get_avg() > upper_valve_selection_speed_table[selection_speed_body][2]) {
+      selection_speed_body_decrease();
+    }
+  } 
+  if (rekt_mode == true) {
+    if (temp_cube.get_avg() > lower_valve_selection_speed_table[selection_speed_body][2]) {
+      selection_speed_body_decrease();
+    }
   }
 }
 
@@ -537,7 +586,7 @@ void close_upper_valve() {
 
 void upper_valve_operation(int speed) {
   if (stabilization_mode == false) {
-    if ((current_time % 30000) < selection_speed_table[speed][1]) {
+    if ((current_time % 30000) < upper_valve_selection_speed_table[speed][1]) {
       if (upper_valve_is_open == false) {
         open_upper_valve();
       }
@@ -551,7 +600,7 @@ void upper_valve_operation(int speed) {
 
 void lower_valve_operation(int speed) {
   if (stabilization_mode == false) {
-    if ((current_time % 30000) < selection_speed_table[speed][1]) {
+    if ((current_time % 30000) < lower_valve_selection_speed_table[speed][1]) {
       if (lower_valve_is_open == false) {
         open_lower_valve();
       }
@@ -611,7 +660,7 @@ int return_temp_diff_fact() {
 }
 
 bool temp_in_pipe_more_than_fixed() {
-  if (return_temp_diff_fact() > temp_diff_snabb) {
+  if (return_temp_diff_fact() > temp_diff) {
     return true;
   }
   else {
@@ -643,7 +692,7 @@ void check_temp_and_start_stabilization_mode_if_temp_not_ok() {
 void scenario_snabby_head() {
   if (scenario_snabby_head_operation == false) {
     operation_time_started = current_time;
-    selection_speed_head = selection_speed_table_len - 4;
+    selection_speed_head = upper_valve_selection_speed_table_len - 4;
     scenario_snabby_head_operation = true;
     under_operation = true;
     Serial.println("scenario_snabby_head started");
@@ -667,6 +716,8 @@ void scenario_snabby_body() {
     scenario_snabby_body_operation = true;
     under_operation = true;
     selection_speed_body = 0;
+    temp_diff = 30;
+    decrease_lim = 29;
     Serial.println("scenario_snabby_body started");
     lcd_set_display_in_operation_update();
   }
@@ -692,7 +743,7 @@ void scenario_snabby_body() {
 void scenario_rekt_head() {
   if (scenario_rekt_head_operation == false) {
     operation_time_started = current_time;
-    selection_speed_head = selection_speed_table_len - 2;
+    selection_speed_head = upper_valve_selection_speed_table_len - 3;
     scenario_rekt_head_operation = true;
     under_operation = true;
     Serial.println("scenario_rekt_head started");
@@ -716,13 +767,15 @@ void scenario_rekt_body() {
     scenario_rekt_body_operation = true;
     under_operation = true;
     selection_speed_body = 0;
+    temp_diff = 20;
+    decrease_lim = 35;
     Serial.println("scenario_rekt_body started");
-    selection_speed_head = selection_speed_table_len - 1;
+    selection_speed_head = upper_valve_selection_speed_table_len - 1;
     lcd_set_display_in_operation_update();
   }
   if (error_mode == false) {
     find_optimal_selection_speed();
-    update_temp_fixed_at_91();
+    // update_temp_fixed_at_91();
     check_temp_and_start_stabilization_mode_if_temp_not_ok();
     if (temp_cube.get_avg() < 9600) {
       upper_valve_operation(selection_speed_head);
@@ -734,7 +787,8 @@ void scenario_rekt_body() {
       confirm_start = false;
       scenario_snabby_body_operation = false;
       under_operation = false;
-      lcd_set_display_in_operation_update();
+      
+      
     }
   } else {
     close_lower_valve();
@@ -752,7 +806,7 @@ void scenario_test() {
     lcd_set_display_in_operation_update();
   } 
   if ((current_time - operation_time_started) < test_mode_duration) {
-    upper_valve_operation(selection_speed_body);
+    lower_valve_operation(selection_speed_body);
   } else {
     close_upper_valve();
     Serial.println("scenario_test finished");
@@ -872,7 +926,7 @@ void lcd_display_stabilization_mode() {
 void lcd_display_temp_pipe() {
   lcd.setCursor(lcd_temp_pipe_coordinates); 
   if (error_mode == false) {
-    if (temp_pipe.get_avg() % 100 < 10) {
+    if (temp_pipe.get_avg() / 100 < 10) {
       lcd.print(" ");
       }
     lcd.print(temp_pipe.get_avg() / 100);
@@ -889,7 +943,7 @@ void lcd_display_temp_pipe() {
 void lcd_display_temp_cube() {
   lcd.setCursor(lcd_temp_cube_coordindates);
   if (error_mode == false) {
-  if (temp_cube.get_avg() % 100 < 10) {
+  if (temp_cube.get_avg() / 100 < 10) {
     lcd.print(" ");
     }
   lcd.print(temp_cube.get_avg() / 100);
@@ -963,8 +1017,6 @@ void lcd_display_data() {
   }
 }
 
-
-
 String lcd_operation_status_text() {
   if (selection_mode == true) {
     return "Selct";
@@ -1002,15 +1054,12 @@ String lcd_05_01_Stab_status_text() {
 void lcd_display_selection_speed_head() {
   lcd.setCursor(lcd_selection_speed_head_coordinates);
   if (head_mode == true or rekt_mode == true) {
-    if (selection_speed_table[selection_speed_head][0] < 100) {
+    if (upper_valve_selection_speed_table[selection_speed_head][0] < 100) {
       lcd.print("  ");
-      lcd.print(selection_speed_table[selection_speed_head][0]);
-    } else if (selection_speed_table[selection_speed_head][0] < 1000) {
+    } else if (upper_valve_selection_speed_table[selection_speed_head][0] < 1000) {
       lcd.print(" ");
-      lcd.print(selection_speed_table[selection_speed_head][0]);
-    } else {
-      lcd.print(selection_speed_table[selection_speed_head][0]);
     }
+    lcd.print(upper_valve_selection_speed_table[selection_speed_head][0]);
   } else {
     lcd.print("----");
   }
@@ -1019,11 +1068,16 @@ void lcd_display_selection_speed_head() {
 void lcd_display_selection_speed_body() {
   lcd.setCursor(lcd_selection_speed_body_coordinates);
   if (body_mode == true) {
-    if (selection_speed_table[selection_speed_body][0] < 1000) {
-      lcd.print(" ");
-      lcd.print(selection_speed_table[selection_speed_body][0]);
-    } else {
-      lcd.print(selection_speed_table[selection_speed_body][0]);
+    if (snab_mode == true) {
+      if (upper_valve_selection_speed_table[selection_speed_body][0] < 1000) {
+        lcd.print(" ");
+      } 
+      lcd.print(upper_valve_selection_speed_table[selection_speed_body][0]);
+    } else if (rekt_mode == true) {
+      if (lower_valve_selection_speed_table[selection_speed_body][0] < 1000) {
+        lcd.print(" ");
+      }
+      lcd.print(lower_valve_selection_speed_table[selection_speed_body][0]);
     }
   } else {
     lcd.print("----");
@@ -1127,9 +1181,7 @@ void single_click() {
 }
 
 void service_single_click() {
-  if (selection_speed_body < selection_speed_table_len) {
-    selection_speed_body_decrease();
-  } 
+  selection_speed_body_decrease(); 
 }
 
 void service_double_click() {
